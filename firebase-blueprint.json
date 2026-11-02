@@ -1,0 +1,270 @@
+{
+  "entities": {
+    "CoffeeBean": {
+      "title": "CoffeeBean",
+      "description": "Master data for coffee beans including origin, variety, process, and tiered pricing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 120 },
+        "origin": { "type": "string", "maxLength": 80 },
+        "variety": { "type": "string", "maxLength": 80 },
+        "process": { "type": "string", "enum": ["Washed", "Natural", "Honey", "Anaerobic", "Wet Hulled", "Full Wash"] },
+        "grade": { "type": "string", "enum": ["Grade 1", "Specialty", "Commercial", "Micro-lot"] },
+        "stockGreenKg": { "type": "number" },
+        "stockRoastedKg": { "type": "number" },
+        "minAlertKg": { "type": "number" },
+        "priceLocalPerKg": { "type": "number" },
+        "priceUmkmPerKg": { "type": "number" },
+        "priceLuarPulauPerKg": { "type": "number" },
+        "storageLocation": { "type": "string", "maxLength": 60 },
+        "moistureAvgPercent": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "origin", "process", "priceLocalPerKg", "priceUmkmPerKg", "priceLuarPulauPerKg"]
+    },
+    "Batch": {
+      "title": "Batch",
+      "description": "Warehouse inventory lot and harvest tracking batch",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "lotNumber": { "type": "string", "maxLength": 50 },
+        "beanId": { "type": "string", "maxLength": 128 },
+        "beanName": { "type": "string", "maxLength": 120 },
+        "origin": { "type": "string", "maxLength": 80 },
+        "process": { "type": "string" },
+        "quantityInitialKg": { "type": "number" },
+        "quantityRemainingKg": { "type": "number" },
+        "bagCount": { "type": "number" },
+        "bagWeightKg": { "type": "number" },
+        "supplierOrFarmer": { "type": "string", "maxLength": 100 },
+        "harvestDate": { "type": "string" },
+        "receivedDate": { "type": "string" },
+        "moistureContent": { "type": "number" },
+        "densityGramsPerLiter": { "type": "number" },
+        "warehouseLocation": { "type": "string", "maxLength": 60 },
+        "status": { "type": "string", "enum": ["In Stock", "Depleted", "In Roasting", "Quarantine"] },
+        "qrCodeData": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["lotNumber", "beanName", "quantityInitialKg", "quantityRemainingKg", "status"]
+    },
+    "RoastLog": {
+      "title": "RoastLog",
+      "description": "Roast Lab precise roasting profile, thermodynamic curve, and cupping score",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "roastNumber": { "type": "string", "maxLength": 50 },
+        "beanId": { "type": "string", "maxLength": 128 },
+        "beanName": { "type": "string", "maxLength": 120 },
+        "batchLotNumber": { "type": "string", "maxLength": 50 },
+        "roasterMachine": { "type": "string", "maxLength": 60 },
+        "roastProfileLevel": { "type": "string", "enum": ["Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"] },
+        "greenWeightGrams": { "type": "number" },
+        "roastedWeightGrams": { "type": "number" },
+        "weightLossPercent": { "type": "number" },
+        "chargeTempC": { "type": "number" },
+        "turningPointTempC": { "type": "number" },
+        "turningPointTimeSec": { "type": "number" },
+        "dryEndTempC": { "type": "number" },
+        "dryEndTimeSec": { "type": "number" },
+        "firstCrackTempC": { "type": "number" },
+        "firstCrackTimeSec": { "type": "number" },
+        "dropTempC": { "type": "number" },
+        "totalTimeSec": { "type": "number" },
+        "dtrPercent": { "type": "number" },
+        "cuppingScore": { "type": "number" },
+        "cuppingNotes": { "type": "string", "maxLength": 500 },
+        "roasterOperator": { "type": "string", "maxLength": 80 },
+        "roastDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Passed QC", "Failed QC", "Cupping Pending", "Sample Only"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["roastNumber", "beanName", "greenWeightGrams", "roastedWeightGrams", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Sales and distribution orders with multi-tier pricing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string", "maxLength": 50 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerType": { "type": "string", "enum": ["Lokal", "UMKM", "Luar Pulau"] },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "customerEmail": { "type": "string", "maxLength": 100 },
+        "customerAddress": { "type": "string", "maxLength": 300 },
+        "items": { "type": "array" },
+        "totalWeightKg": { "type": "number" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "tax": { "type": "number" },
+        "shippingCost": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "status": { "type": "string", "enum": ["Draft", "Confirmed", "Processing", "Ready to Ship", "Shipped", "Completed", "Cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["Unpaid", "Down Payment", "Paid in Full"] },
+        "orderDate": { "type": "string" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["invoiceNumber", "customerName", "customerType", "grandTotal", "status"]
+    },
+    "Shipment": {
+      "title": "Shipment",
+      "description": "Logistics dispatch and island transit tracking including local Aceh loket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trackingNumber": { "type": "string", "maxLength": 60 },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "invoiceNumber": { "type": "string", "maxLength": 50 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "courierName": { "type": "string", "maxLength": 80 },
+        "serviceType": { "type": "string", "maxLength": 80 },
+        "destinationRegion": { "type": "string", "maxLength": 100 },
+        "destinationIsland": { "type": "string", "enum": ["Aceh (Lokal Loket)", "Jawa", "Sumatera", "Kalimantan", "Sulawesi", "Bali & Nusa Tenggara", "Maluku & Papua"] },
+        "weightKg": { "type": "number" },
+        "shippingCost": { "type": "number" },
+        "status": { "type": "string", "enum": ["Manifested", "Cargo Drop", "In Transit (Laut/Udara)", "In Transit (Loket Aceh)", "Out for Delivery", "Delivered", "Returned"] },
+        "dispatchedAt": { "type": "string" },
+        "estimatedDelivery": { "type": "string" },
+        "deliveredAt": { "type": "string" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["trackingNumber", "courierName", "customerName", "status"]
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "Relational contacts for Farmers/Suppliers, Customers/Roasteries, and Aceh Loket logistics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "enum": ["Pemasok / Petani", "Pelanggan / Kedai", "Mitra Loket Aceh"] },
+        "category": { "type": "string", "maxLength": 80 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 80 },
+        "address": { "type": "string", "maxLength": 200 },
+        "defaultPricingTier": { "type": "string", "enum": ["Lokal", "UMKM", "Luar Pulau"] },
+        "notes": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "type", "phone"]
+    },
+    "InboundMovement": {
+      "title": "InboundMovement",
+      "description": "Penerimaan Barang Masuk (Green Bean intake from farmers/suppliers)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "docNumber": { "type": "string", "maxLength": 50 },
+        "date": { "type": "string" },
+        "partnerId": { "type": "string", "maxLength": 128 },
+        "partnerName": { "type": "string", "maxLength": 120 },
+        "beanId": { "type": "string", "maxLength": 128 },
+        "beanName": { "type": "string", "maxLength": 120 },
+        "lotNumber": { "type": "string", "maxLength": 50 },
+        "bagCount": { "type": "number" },
+        "weightKg": { "type": "number" },
+        "moisturePercent": { "type": "number" },
+        "warehouseLocation": { "type": "string", "maxLength": 80 },
+        "supplierDeliveryNote": { "type": "string", "maxLength": 80 },
+        "receivedBy": { "type": "string", "maxLength": 80 },
+        "notes": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["docNumber", "partnerName", "beanName", "weightKg"]
+    },
+    "OutboundMovement": {
+      "title": "OutboundMovement",
+      "description": "Pengeluaran Barang Keluar (Goods dispatch via order or Aceh Loket)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "docNumber": { "type": "string", "maxLength": 50 },
+        "date": { "type": "string" },
+        "partnerId": { "type": "string", "maxLength": 128 },
+        "partnerName": { "type": "string", "maxLength": 120 },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "invoiceNumber": { "type": "string", "maxLength": 50 },
+        "beanId": { "type": "string", "maxLength": 128 },
+        "beanName": { "type": "string", "maxLength": 120 },
+        "itemType": { "type": "string", "enum": ["Green Bean", "Roasted Bean", "Ground"] },
+        "quantityKg": { "type": "number" },
+        "loketOrCourier": { "type": "string", "maxLength": 80 },
+        "destinationCity": { "type": "string", "maxLength": 80 },
+        "driverNameOrPhone": { "type": "string", "maxLength": 80 },
+        "vehiclePlate": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["Dispatched", "In Transit", "Delivered"] },
+        "dispatchedBy": { "type": "string", "maxLength": 80 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["docNumber", "partnerName", "beanName", "quantityKg"]
+    },
+    "NotificationLog": {
+      "title": "NotificationLog",
+      "description": "Automated dispatch log for WhatsApp and Email notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "channel": { "type": "string", "enum": ["WhatsApp", "Email"] },
+        "recipient": { "type": "string", "maxLength": 120 },
+        "subject": { "type": "string", "maxLength": 150 },
+        "messagePreview": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["Order Invoice", "Stock Alert", "Roast QC Alert", "Shipment Dispatched", "Delivery Confirmed"] },
+        "status": { "type": "string", "enum": ["Sent", "Pending", "Failed"] },
+        "sentAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["channel", "recipient", "type", "status"]
+    }
+  },
+  "firestore": {
+    "/coffee_beans/{beanId}": {
+      "schema": "CoffeeBean",
+      "description": "Catalog and real-time inventory balances of green and roasted coffee beans"
+    },
+    "/batches/{batchId}": {
+      "schema": "Batch",
+      "description": "Warehouse lot intake, bag storage, moisture, and batch status"
+    },
+    "/roast_logs/{roastId}": {
+      "schema": "RoastLog",
+      "description": "Precision roasting parameters, curves, cupping quality metrics"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer purchase orders with tier-specific pricing (Lokal, UMKM, Luar Pulau)"
+    },
+    "/shipments/{shipmentId}": {
+      "schema": "Shipment",
+      "description": "Shipping consignments, island cargo routing, and Aceh loket tracking"
+    },
+    "/partners/{partnerId}": {
+      "schema": "Partner",
+      "description": "Relational contacts: Pemasok/Petani, Pelanggan, and Loket Aceh"
+    },
+    "/inbound_movements/{movementId}": {
+      "schema": "InboundMovement",
+      "description": "Barang Masuk / Penerimaan kopi dari petani/pemasok"
+    },
+    "/outbound_movements/{movementId}": {
+      "schema": "OutboundMovement",
+      "description": "Barang Keluar / Pengeluaran pesanan via loket Aceh atau kargo"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "NotificationLog",
+      "description": "History of automated notifications sent via WhatsApp and Email"
+    }
+  }
+}

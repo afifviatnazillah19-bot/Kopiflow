@@ -1,0 +1,7 @@
+{
+  "name": "KopiFlow ERP - Coffee Warehouse & Roast Lab",
+  "description": "Sistem ERP pergudangan kopi komprehensif dengan pelacakan stok real-time, manajemen batch, multi-tier pricing (Lokal, UMKM, Luar Pulau), Roast Lab presisi, pelacakan pengiriman, dan integrasi notifikasi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

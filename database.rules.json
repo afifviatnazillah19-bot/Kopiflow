@@ -1,0 +1,30 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "coffee_beans": {
+      ".indexOn": ["name", "stockGreenKg", "stockRoastedKg"]
+    },
+    "batches": {
+      ".indexOn": ["lotNumber", "status"]
+    },
+    "orders": {
+      ".indexOn": ["invoiceNumber", "status", "orderDate"]
+    },
+    "shipments": {
+      ".indexOn": ["trackingNumber", "status"]
+    },
+    "partners": {
+      ".indexOn": ["name", "type"]
+    },
+    "inbound_movements": {
+      ".indexOn": ["docNumber", "date"]
+    },
+    "outbound_movements": {
+      ".indexOn": ["docNumber", "date"]
+    },
+    "roast_logs": {
+      ".indexOn": ["roastNumber", "status"]
+    }
+  }
+}

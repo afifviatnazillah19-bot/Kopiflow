@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Health check and connection verification
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Coffee beans master & stock
+    match /coffee_beans/{beanId} {
+      allow read, write: if true;
+    }
+
+    // Warehouse batches / lot tracking
+    match /batches/{batchId} {
+      allow read, write: if true;
+    }
+
+    // Roast Lab profiles & cupping logs
+    match /roast_logs/{roastId} {
+      allow read, write: if true;
+    }
+
+    // Multi-tier sales orders
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // Shipments & Aceh Loket logistics
+    match /shipments/{shipmentId} {
+      allow read, write: if true;
+    }
+
+    // Relational partners (Petani, Pelanggan, Loket)
+    match /partners/{partnerId} {
+      allow read, write: if true;
+    }
+
+    // Barang Masuk (Inbound Movements)
+    match /inbound_movements/{movementId} {
+      allow read, write: if true;
+    }
+
+    // Barang Keluar (Outbound Movements)
+    match /outbound_movements/{movementId} {
+      allow read, write: if true;
+    }
+
+    // Notification logs (WhatsApp & Email)
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // System settings (QRIS GoPay, general settings)
+    match /system_settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Default deny for unlisted documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
