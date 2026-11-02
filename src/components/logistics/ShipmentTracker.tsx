@@ -12,10 +12,12 @@ import {
   ArrowRight,
   Package,
   Anchor,
-  Navigation
+  Navigation,
+  Printer
 } from 'lucide-react';
 import { Shipment, Order, IslandRegion, ShipmentStatus } from '../../types/erp';
 import { formatIDR, saveShipment, updateShipmentStatus, buildWhatsAppLink, saveNotificationLog } from '../../services/dbService';
+import { ShippingLabelModal } from './ShippingLabelModal';
 
 interface ShipmentTrackerProps {
   shipments: Shipment[];
@@ -33,6 +35,7 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isNewShipmentModalOpen, setIsNewShipmentModalOpen] = useState(false);
   const [selectedShipmentForUpdate, setSelectedShipmentForUpdate] = useState<Shipment | null>(null);
+  const [selectedShipmentForLabel, setSelectedShipmentForLabel] = useState<Shipment | null>(null);
 
   // New Shipment form
   const [selectedOrderId, setSelectedOrderId] = useState<string>(orders[0]?.id || '');
@@ -381,13 +384,25 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
                     {s.notes || 'Titip di loket tujuan'}
                   </p>
 
-                  <button
-                    onClick={() => handleSendWhatsAppTracking(s)}
-                    className="inline-flex items-center gap-1 rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 shadow-2xs shrink-0"
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    <span>Kirim Resi via WA</span>
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedShipmentForLabel(s)}
+                      className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-zinc-900 shadow-2xs"
+                      title="Cetak Label Tempel Karung / Kardus atau Surat Jalan Resmi"
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      <span>Cetak Label</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSendWhatsAppTracking(s)}
+                      className="inline-flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 shadow-2xs"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      <span>Kirim WA</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -666,6 +681,20 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Shipping Label & Surat Jalan Printable Modal */}
+      {selectedShipmentForLabel && (
+        <ShippingLabelModal
+          shipment={selectedShipmentForLabel}
+          order={orders.find(
+            (o) =>
+              o.id === selectedShipmentForLabel.orderId ||
+              o.invoiceNumber === selectedShipmentForLabel.invoiceNumber
+          )}
+          isOpen={!!selectedShipmentForLabel}
+          onClose={() => setSelectedShipmentForLabel(null)}
+        />
       )}
     </div>
   );

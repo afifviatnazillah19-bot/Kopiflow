@@ -12,7 +12,11 @@ import {
   MessageCircle,
   Share2,
   Activity,
-  ArrowRight
+  ArrowRight,
+  Wrench,
+  Cpu,
+  Gauge,
+  SlidersHorizontal
 } from 'lucide-react';
 import { RoastLog, CoffeeBean, Batch, RoastLevel, RoastStatus } from '../../types/erp';
 import { RoastCurveChart } from './RoastCurveChart';
@@ -39,6 +43,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
   const [isNewRoastModalOpen, setIsNewRoastModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [machineFilter, setMachineFilter] = useState<string>('all');
 
   // Handle external trigger from Header
   React.useEffect(() => {
@@ -51,7 +56,8 @@ export const RoastLab: React.FC<RoastLabProps> = ({
   // New Roast Form
   const [selectedBeanId, setSelectedBeanId] = useState<string>(beans[0]?.id || '');
   const [batchLotNumber, setBatchLotNumber] = useState<string>(batches[0]?.lotNumber || '');
-  const [roasterMachine, setRoasterMachine] = useState<string>('Giesen W6A (Drum Roaster)');
+  const [roasterMachine, setRoasterMachine] = useState<string>('Mesin Roasting Rakitan (Drum 1-5 kg)');
+  const [customMachineName, setCustomMachineName] = useState<string>('');
   const [roastProfileLevel, setRoastProfileLevel] = useState<RoastLevel>('Medium-Light');
   const [greenWeightGrams, setGreenWeightGrams] = useState<number>(5000);
   const [roastedWeightGrams, setRoastedWeightGrams] = useState<number>(4320);
@@ -85,6 +91,11 @@ export const RoastLab: React.FC<RoastLabProps> = ({
     const bean = beans.find((b) => b.id === selectedBeanId);
     if (!bean) return;
 
+    const finalMachineName =
+      roasterMachine === 'Mesin Roasting Rakitan (Kustom)' && customMachineName.trim()
+        ? `Mesin Roasting Rakitan (${customMachineName.trim()})`
+        : roasterMachine;
+
     const roastNumber = `RST-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
 
     const newRoast: RoastLog = {
@@ -93,7 +104,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
       beanId: bean.id,
       beanName: bean.name,
       batchLotNumber,
-      roasterMachine,
+      roasterMachine: finalMachineName,
       roastProfileLevel,
       greenWeightGrams,
       roastedWeightGrams,
@@ -153,14 +164,21 @@ export const RoastLab: React.FC<RoastLabProps> = ({
       r.roastNumber.toLowerCase().includes(search.toLowerCase()) ||
       r.beanName.toLowerCase().includes(search.toLowerCase()) ||
       r.batchLotNumber.toLowerCase().includes(search.toLowerCase()) ||
+      r.roasterMachine.toLowerCase().includes(search.toLowerCase()) ||
       r.roasterOperator.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || r.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchMachine =
+      machineFilter === 'all'
+        ? true
+        : machineFilter === 'rakitan'
+        ? r.roasterMachine.toLowerCase().includes('rakitan')
+        : r.roasterMachine.toLowerCase().includes(machineFilter.toLowerCase());
+    return matchSearch && matchStatus && matchMachine;
   });
 
   return (
     <div className="space-y-6">
-      {/* Top Bar */}
+      {/* Top Bar with Search & Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {/* Search */}
@@ -175,6 +193,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
             />
           </div>
 
+          {/* QC Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -185,15 +204,223 @@ export const RoastLab: React.FC<RoastLabProps> = ({
             <option value="Failed QC">Failed QC</option>
             <option value="Cupping Pending">Cupping Pending</option>
           </select>
+
+          {/* Roasting Machine Filter */}
+          <select
+            value={machineFilter}
+            onChange={(e) => setMachineFilter(e.target.value)}
+            className="rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-xs font-semibold text-amber-900 focus:border-amber-600 focus:outline-hidden"
+          >
+            <option value="all">Semua Mesin Roasting</option>
+            <option value="rakitan">🛠️ Mesin Roasting Rakitan (Lokal)</option>
+            <option value="Giesen">Giesen W6A</option>
+            <option value="Probat">Probat UG22</option>
+            <option value="Berto">Berto Type One</option>
+            <option value="Diedrich">Diedrich IR-12</option>
+          </select>
         </div>
 
         <button
-          onClick={() => setIsNewRoastModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-orange-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-orange-800 transition-colors"
+          onClick={() => {
+            setRoasterMachine('Mesin Roasting Rakitan (Drum 1-5 kg)');
+            setIsNewRoastModalOpen(true);
+          }}
+          className="flex items-center gap-1.5 rounded-lg bg-orange-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-orange-800 transition-colors shrink-0"
         >
           <Plus className="h-4 w-4" />
           <span>+ Catat Sesi Sangrai Baru</span>
         </button>
+      </div>
+
+      {/* SECTION: ARMADA MESIN ROASTING (Termasuk Mesin Roasting Rakitan) */}
+      <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
+                <Flame className="h-4 w-4" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-900">
+                Armada Mesin Roasting & Lab Kalibrasi
+              </h3>
+            </div>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Daftar mesin sangrai aktif: Tersedia mesin roasting rakitan pengrajin lokal untuk UMKM & micro-lot serta mesin industri berkapasitas besar.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200">
+              ● 5 Mesin Terdaftar Siap Pakai
+            </span>
+          </div>
+        </div>
+
+        {/* Machine Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card 1: Mesin Roasting Rakitan (Featured) */}
+          <div className="rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 via-white to-orange-50/60 p-3.5 space-y-2 relative shadow-xs hover:border-amber-500 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="rounded bg-amber-600 text-white px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+                🛠️ Rakitan Lokal
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-700">Aktif</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
+                <Wrench className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-xs text-zinc-900 leading-tight">
+                  Mesin Roasting Rakitan
+                </h4>
+                <span className="text-[10px] text-amber-800 font-medium">
+                  Drum Kustom 1 - 5 kg
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-600 leading-snug">
+              Drum stainless steel/cast iron rakitan pengrajin lokal, burner gas LPG needle valve, & dual probe digital thermocouple.
+            </p>
+
+            <div className="pt-2 border-t border-amber-200 flex items-center justify-between text-[11px]">
+              <span className="font-bold text-amber-900 text-[10px]">Profil Micro-lot</span>
+              <button
+                onClick={() => {
+                  setRoasterMachine('Mesin Roasting Rakitan (Drum 1-5 kg)');
+                  setIsNewRoastModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1 font-bold text-xs text-amber-700 hover:text-amber-900 underline"
+              >
+                Pakai Mesin <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* Card 2: Mesin Rakitan Artisan 10 kg */}
+          <div className="rounded-xl border border-amber-300 bg-amber-50/40 p-3.5 space-y-2 shadow-2xs hover:border-amber-400 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="rounded bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 text-[9px] font-bold">
+                🛠️ Rakitan Artisan
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-700">Aktif</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-700 text-white shadow-xs">
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs text-zinc-900 leading-tight">
+                  Rakitan Artisan 10 kg
+                </h4>
+                <span className="text-[10px] text-zinc-500 font-medium">
+                  Semi-Hot Air Gayo
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-600 leading-snug">
+              Kapasitas produksi sedang untuk pesanan kedai lokal & UMKM dengan pengaturan blower airflow manual.
+            </p>
+
+            <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between text-[11px]">
+              <span className="text-zinc-500 text-[10px]">Batch 10 kg</span>
+              <button
+                onClick={() => {
+                  setRoasterMachine('Mesin Roasting Rakitan Artisan (Dual Probe 10 kg)');
+                  setIsNewRoastModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1 font-bold text-xs text-amber-700 hover:text-amber-900 underline"
+              >
+                Pakai Mesin <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+
+          {/* Card 3: Giesen W6A */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-3.5 space-y-2 shadow-2xs hover:border-zinc-300 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="rounded bg-zinc-100 text-zinc-700 px-1.5 py-0.2 text-[9px] font-semibold">
+                🏭 Komersial
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-700">Aktif</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-white shadow-xs">
+                <Flame className="h-5 w-5 text-orange-400" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs text-zinc-900 leading-tight">
+                  Giesen W6A
+                </h4>
+                <span className="text-[10px] text-zinc-500 font-medium">
+                  Cast Iron Drum 6 kg
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-600 leading-snug">
+              Mesin profil presisi tinggi Belanda untuk sangrai Specialty Grade 1 dan evaluasi sensori cupping SCA.
+            </p>
+
+            <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
+              <span className="text-zinc-500 text-[10px]">Batch 6 kg</span>
+              <button
+                onClick={() => {
+                  setRoasterMachine('Giesen W6A (Drum Roaster)');
+                  setIsNewRoastModalOpen(true);
+                }}
+                className="font-bold text-xs text-zinc-700 hover:text-zinc-900 underline"
+              >
+                Pakai Mesin
+              </button>
+            </div>
+          </div>
+
+          {/* Card 4: Probat & Berto */}
+          <div className="rounded-xl border border-zinc-200 bg-white p-3.5 space-y-2 shadow-2xs hover:border-zinc-300 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="rounded bg-zinc-100 text-zinc-700 px-1.5 py-0.2 text-[9px] font-semibold">
+                🏭 Industri
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-700">Aktif</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-white shadow-xs">
+                <Cpu className="h-5 w-5 text-blue-400" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs text-zinc-900 leading-tight">
+                  Probat UG22 & Berto 5kg
+                </h4>
+                <span className="text-[10px] text-zinc-500 font-medium">
+                  Kapasitas Besar
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-600 leading-snug">
+              Mesin roaster kapasitas besar untuk pemenuhan pesanan partai luar pulau (Jawa, Kalimantan, Sulawesi).
+            </p>
+
+            <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
+              <span className="text-zinc-500 text-[10px]">Batch 5-22 kg</span>
+              <button
+                onClick={() => {
+                  setRoasterMachine('Probat UG22 (Industrial Roaster)');
+                  setIsNewRoastModalOpen(true);
+                }}
+                className="font-bold text-xs text-zinc-700 hover:text-zinc-900 underline"
+              >
+                Pakai Mesin
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Main View: Curve Chart on Top / Right, Roast List on Left */}
@@ -221,13 +448,22 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                 >
                   <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-100">
                     <div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-mono text-xs font-bold text-amber-900">
                           {roast.roastNumber}
                         </span>
                         <span className="rounded bg-zinc-100 px-1.5 py-0.2 text-[10px] font-semibold text-zinc-600">
                           {roast.roastProfileLevel}
                         </span>
+                        {roast.roasterMachine.toLowerCase().includes('rakitan') ? (
+                          <span className="rounded bg-amber-100 border border-amber-300 px-1.5 py-0.2 text-[9px] font-extrabold text-amber-900">
+                            🛠️ Rakitan
+                          </span>
+                        ) : (
+                          <span className="rounded bg-zinc-100 px-1.5 py-0.2 text-[9px] font-medium text-zinc-500">
+                            {roast.roasterMachine.split(' ')[0]}
+                          </span>
+                        )}
                       </div>
                       <h4 className="font-bold text-xs text-zinc-900 mt-1 truncate">
                         {roast.beanName}
@@ -451,17 +687,49 @@ export const RoastLab: React.FC<RoastLabProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Mesin Roasting</label>
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Mesin Roasting
+                  </label>
                   <select
                     value={roasterMachine}
                     onChange={(e) => setRoasterMachine(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   >
-                    <option value="Giesen W6A (Drum Roaster)">Giesen W6A (Drum)</option>
-                    <option value="Probat UG22 (Industrial Roaster)">Probat UG22</option>
-                    <option value="Berto Type One 5kg">Berto Type One 5kg</option>
-                    <option value="Diedrich IR-12 (Infrared)">Diedrich IR-12</option>
+                    <optgroup label="🛠️ Mesin Roasting Rakitan (Lokal / Kustom)">
+                      <option value="Mesin Roasting Rakitan (Drum 1-5 kg)">
+                        Mesin Roasting Rakitan (Drum 1-5 kg)
+                      </option>
+                      <option value="Mesin Roasting Rakitan Lokal (Drum 3 kg Semi-Hot Air)">
+                        Mesin Roasting Rakitan Lokal (Drum 3 kg Semi-Hot Air)
+                      </option>
+                      <option value="Mesin Roasting Rakitan Artisan (Dual Probe 10 kg)">
+                        Mesin Roasting Rakitan Artisan (Dual Probe 10 kg)
+                      </option>
+                      <option value="Mesin Roasting Rakitan Bengkel Gayo Takengon">
+                        Mesin Roasting Rakitan Bengkel Gayo Takengon
+                      </option>
+                      <option value="Mesin Roasting Rakitan (Kustom)">
+                        Mesin Roasting Rakitan (Kustom / Input Nama Sendiri...)
+                      </option>
+                    </optgroup>
+                    <optgroup label="🏭 Mesin Komersial & Industri">
+                      <option value="Giesen W6A (Drum Roaster)">Giesen W6A (Drum)</option>
+                      <option value="Probat UG22 (Industrial Roaster)">Probat UG22 (Industri)</option>
+                      <option value="Berto Type One 5kg">Berto Type One 5kg</option>
+                      <option value="Diedrich IR-12 (Infrared)">Diedrich IR-12 (Infrared)</option>
+                    </optgroup>
                   </select>
+                  {roasterMachine === 'Mesin Roasting Rakitan (Kustom)' && (
+                    <div className="mt-1.5">
+                      <input
+                        type="text"
+                        placeholder="Ketik spesifikasi/nama mesin rakitan kustom..."
+                        value={customMachineName}
+                        onChange={(e) => setCustomMachineName(e.target.value)}
+                        className="w-full rounded-lg border border-amber-300 bg-amber-50/50 px-2.5 py-1 text-xs focus:border-amber-600 focus:outline-hidden"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>

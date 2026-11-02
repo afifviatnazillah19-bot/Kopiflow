@@ -49,9 +49,21 @@ export interface CoffeeBean {
   costPackagingPerKg?: number;
   costOverheadPerKg?: number;
   hppPerKg?: number;
+  minAlertRoastedKg?: number;
   notes?: string;
   updatedAt: string;
   createdAt: string;
+}
+
+export interface BusinessNotificationConfig {
+  businessWhatsApp: string;
+  businessEmail: string;
+  managerName: string;
+  autoSendEnabled: boolean;
+  defaultMinThresholdKg: number;
+  notifyOnGreenLow: boolean;
+  notifyOnRoastedLow: boolean;
+  updatedAt: string;
 }
 
 export interface QrisPaymentConfig {

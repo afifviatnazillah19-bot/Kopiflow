@@ -15,8 +15,10 @@ import {
   FileText,
   CreditCard,
   Send,
-  QrCode
+  QrCode,
+  Package
 } from 'lucide-react';
+import { ShippingLabelModal } from '../logistics/ShippingLabelModal';
 import {
   Order,
   OrderItem,
@@ -55,6 +57,7 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
   const [tierFilter, setTierFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
+  const [selectedOrderForLabel, setSelectedOrderForLabel] = useState<Order | null>(null);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [qrisConfig, setQrisConfig] = useState<QrisPaymentConfig>(DEFAULT_QRIS_CONFIG);
 
@@ -432,6 +435,15 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                         </button>
 
                         <button
+                          onClick={() => setSelectedOrderForLabel(order)}
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900 hover:bg-amber-100 shadow-2xs"
+                          title="Cetak Label Tempel Paket / Surat Jalan"
+                        >
+                          <Package className="h-3 w-3 text-amber-800" />
+                          <span>Label Kirim</span>
+                        </button>
+
+                        <button
                           onClick={() => handleSendWhatsAppInvoice(order)}
                           className="inline-flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-800 shadow-2xs"
                           title="Kirim Invoice ke WhatsApp Customer"
@@ -643,6 +655,18 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => {
+                    const ord = selectedOrderForInvoice;
+                    setSelectedOrderForInvoice(null);
+                    setSelectedOrderForLabel(ord);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100"
+                >
+                  <Package className="h-4 w-4 text-amber-800" />
+                  <span>Cetak Label Pengiriman</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSelectedOrderForInvoice(null)}
                   className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
                 >
@@ -653,7 +677,7 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                   className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800"
                 >
                   <Printer className="h-4 w-4" />
-                  <span>Cetak Dokumen</span>
+                  <span>Cetak Faktur</span>
                 </button>
               </div>
             </div>
@@ -900,6 +924,15 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Shipping Label & Surat Jalan Printable Modal */}
+      {selectedOrderForLabel && (
+        <ShippingLabelModal
+          order={selectedOrderForLabel}
+          isOpen={!!selectedOrderForLabel}
+          onClose={() => setSelectedOrderForLabel(null)}
+        />
       )}
     </div>
   );

@@ -21,7 +21,8 @@ import {
   InboundMovement,
   OutboundMovement,
   PricingTier,
-  QrisPaymentConfig
+  QrisPaymentConfig,
+  BusinessNotificationConfig
 } from '../types/erp';
 import {
   ACEH_LOKET_PRESETS,
@@ -1049,6 +1050,219 @@ export function subscribeToQrisConfig(
   return () => {
     localUnsub();
     if (firestoreUnsub) firestoreUnsub();
+  };
+}
+
+// -------------------------------------------------------------
+// KONFIGURASI NOTIFIKASI BISNIS & AUTOMATISASI STOK MENIPIS GUDANG
+// -------------------------------------------------------------
+export const DEFAULT_NOTIFICATION_CONFIG: BusinessNotificationConfig = {
+  businessWhatsApp: '6281269008899',
+  businessEmail: 'afifviatnazillah19@gmail.com',
+  managerName: 'Kepala Gudang & Roastery KopiFlow',
+  autoSendEnabled: true,
+  defaultMinThresholdKg: 100,
+  notifyOnGreenLow: true,
+  notifyOnRoastedLow: true,
+  updatedAt: new Date().toISOString()
+};
+
+export function getNotificationConfig(): BusinessNotificationConfig {
+  return getLocalCache<BusinessNotificationConfig>(
+    'business_notification_config',
+    DEFAULT_NOTIFICATION_CONFIG
+  );
+}
+
+export async function saveNotificationConfig(config: BusinessNotificationConfig): Promise<void> {
+  const updated = {
+    ...config,
+    updatedAt: new Date().toISOString()
+  };
+  setLocalCache('business_notification_config', updated);
+
+  try {
+    const payload = removeUndefined(updated);
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'notification_config'), payload));
+    await syncToRTDB(COLLECTIONS.SETTINGS, 'notification_config', payload);
+  } catch (error) {
+    console.warn('Notice saving notification config to Firestore:', error);
+  }
+}
+
+export function subscribeToNotificationConfig(
+  callback: (config: BusinessNotificationConfig) => void
+): () => void {
+  const initial = getNotificationConfig();
+  callback(initial);
+
+  const localUnsub = listenLocalCache<BusinessNotificationConfig>(
+    'business_notification_config',
+    (data) => {
+      callback(data || DEFAULT_NOTIFICATION_CONFIG);
+    }
+  );
+
+  let firestoreUnsub: (() => void) | null = null;
+  try {
+    firestoreUnsub = onSnapshot(
+      doc(db, COLLECTIONS.SETTINGS, 'notification_config'),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const cfg = snapshot.data() as BusinessNotificationConfig;
+          setLocalCache('business_notification_config', cfg);
+          callback(cfg);
+        }
+      },
+      (error) => {
+        console.warn('Real-time listener notice on notification config:', error?.message || error);
+        callback(getNotificationConfig());
+      }
+    );
+  } catch (err) {
+    console.warn('Subscription init warning on notification config:', err);
+  }
+
+  return () => {
+    localUnsub();
+    if (firestoreUnsub) firestoreUnsub();
+  };
+}
+
+export function buildEmailLink(email: string, subject: string, body: string): string {
+  return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+// Generator Pesan Peringatan Stok Menipis Gabungan (Multi-SKU)
+export function buildLowStockAlertMessage(
+  beans: CoffeeBean[],
+  config: BusinessNotificationConfig
+): { subject: string; body: string; lowBeans: CoffeeBean[] } {
+  const lowBeans = beans.filter(
+    (b) =>
+      (config.notifyOnGreenLow && (b.stockGreenKg || 0) <= (b.minAlertKg || config.defaultMinThresholdKg)) ||
+      (config.notifyOnRoastedLow &&
+        (b.stockRoastedKg || 0) <= (b.minAlertRoastedKg || 20) &&
+        (b.stockRoastedKg || 0) >= 0)
+  );
+
+  const dateStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const subject = `⚠️ PERINGATAN GUDANG: ${lowBeans.length} Jenis Stok Kopi Menipis (${dateStr})`;
+
+  const itemsDetail = lowBeans
+    .map((b, idx) => {
+      const minGreen = b.minAlertKg || config.defaultMinThresholdKg;
+      const deficit = Math.max(0, minGreen - (b.stockGreenKg || 0));
+      return (
+        `[${idx + 1}] *${b.name.toUpperCase()}*\n` +
+        `   • Sisa Green Beans : *${(b.stockGreenKg || 0).toLocaleString('id-ID')} kg*\n` +
+        `   • Batas Minimal    : ${minGreen.toLocaleString('id-ID')} kg\n` +
+        `   • Defisit Stok     : *-${deficit.toLocaleString('id-ID')} kg (KRITIS)*\n` +
+        `   • Lokasi Silo/Rak  : ${b.storageLocation || 'Gudang Utama'}\n` +
+        `   • Kadar Air Rata   : ${b.moistureAvgPercent || 11.2}%`
+      );
+    })
+    .join('\n\n');
+
+  const body =
+    `*🚨 PERINGATAN RESMI: STOK BIJI KOPI MENIPIS DI GUDANG*\n` +
+    `Sistem Monitoring Inventaris KopiFlow ERP\n` +
+    `Tanggal & Waktu: ${dateStr} WIB\n\n` +
+    `Yth. *${config.managerName || 'Kepala Gudang & Tim Procurement'}*,\n\n` +
+    `Sistem mendeteksi bahwa stok fisik biji kopi mentah (green beans) di gudang telah berada di bawah *INDIKATOR BATAS MINIMAL STOK*:\n\n` +
+    `${itemsDetail || '• Belum ada stok di bawah batas minimal saat ini.'}\n\n` +
+    `*Rekomendasi Tindakan Segera:*\n` +
+    `1. Hubungi petani rekanan / pabrik pengolahan untuk pengiriman intake lot baru.\n` +
+    `2. Verifikasi fisik dengan menekan tombol 'Opname' pada menu Gudang Green Beans.\n` +
+    `3. Tunda pemenuhan order partai besar yang melebihi saldo aman.\n\n` +
+    `Pesan ini digenerate otomatis oleh KopiFlow Roastery & Warehouse System.\n` +
+    `Email Bisnis: ${config.businessEmail} | WA: ${config.businessWhatsApp}`;
+
+  return { subject, body, lowBeans };
+}
+
+// Generator Pesan Peringatan Stok Menipis untuk 1 Jenis Biji Kopi
+export function buildSingleBeanLowStockMessage(
+  bean: CoffeeBean,
+  config: BusinessNotificationConfig
+): { subject: string; body: string; whatsappUrl: string; mailtoUrl: string } {
+  const minThreshold = bean.minAlertKg || config.defaultMinThresholdKg;
+  const currentStock = bean.stockGreenKg || 0;
+  const deficit = Math.max(0, minThreshold - currentStock);
+  const dateStr = new Date().toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const subject = `⚠️ STOK MENIPIS: ${bean.name} (${currentStock} kg / Min: ${minThreshold} kg)`;
+
+  const body =
+    `*🚨 PERINGATAN GUDANG KOPIFLOW: STOK MENIPIS*\n\n` +
+    `Komoditas   : *${bean.name}*\n` +
+    `Asal / Var  : ${bean.origin} (${bean.variety})\n` +
+    `Proses/Mutu : ${bean.process} - ${bean.grade}\n` +
+    `Lokasi Gudang: *${bean.storageLocation || 'Silo Utama'}*\n\n` +
+    `📊 *STATUS INDIKATOR STOK GUDANG:*\n` +
+    `• Stok Fisik Saat Ini : *${currentStock.toLocaleString('id-ID')} kg*\n` +
+    `• Batas Minimal Aman  : *${minThreshold.toLocaleString('id-ID')} kg*\n` +
+    `• Kekurangan/Defisit  : *-${deficit.toLocaleString('id-ID')} kg (PERLU RE-ORDER)*\n` +
+    `• Kadar Air (MC)      : ${bean.moistureAvgPercent || 11.2}%\n\n` +
+    `Waktu Alert: ${dateStr} WIB\n\n` +
+    `Mohon segera lakukan koordinasi dengan bagian pembelian / petani mitra agar ketersediaan biji kopi tetap terjaga.\n\n` +
+    `KopiFlow Roastery ERP Takengon`;
+
+  const whatsappUrl = buildWhatsAppLink(config.businessWhatsApp, body);
+  const mailtoUrl = buildEmailLink(config.businessEmail, subject, body);
+
+  return { subject, body, whatsappUrl, mailtoUrl };
+}
+
+// Auto-trigger Pengecekan dan Pencatatan Log Notifikasi ke Database
+export async function triggerAutoLowStockCheck(
+  beans: CoffeeBean[],
+  configOverride?: BusinessNotificationConfig,
+  autoLog: boolean = true
+): Promise<{
+  lowCount: number;
+  lowBeans: CoffeeBean[];
+  subject: string;
+  body: string;
+  whatsappUrl: string;
+  mailtoUrl: string;
+}> {
+  const config = configOverride || getNotificationConfig();
+  const { subject, body, lowBeans } = buildLowStockAlertMessage(beans, config);
+
+  const whatsappUrl = buildWhatsAppLink(config.businessWhatsApp, body);
+  const mailtoUrl = buildEmailLink(config.businessEmail, subject, body);
+
+  if (autoLog && lowBeans.length > 0) {
+    const logId = `notif-stock-${Date.now().toString(36)}`;
+    const newLog: NotificationLog = {
+      id: logId,
+      channel: 'WhatsApp',
+      recipient: `${config.businessWhatsApp} / ${config.businessEmail}`,
+      subject,
+      messagePreview: body.slice(0, 220) + '...',
+      type: 'Stock Alert',
+      status: 'Sent',
+      sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      createdAt: new Date().toISOString()
+    };
+    await saveNotificationLog(newLog);
+  }
+
+  return {
+    lowCount: lowBeans.length,
+    lowBeans,
+    subject,
+    body,
+    whatsappUrl,
+    mailtoUrl
   };
 }
 

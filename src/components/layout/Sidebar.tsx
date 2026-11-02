@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Gudang Green Beans',
       icon: Wheat,
       badge: lowStockCount > 0 ? `${lowStockCount} menipis` : 'Mentah / Lot',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300'
+      badgeColor: lowStockCount > 0 ? 'bg-rose-500 text-white font-extrabold' : 'bg-emerald-500/20 text-emerald-300'
     },
     {
       id: 'roastlab' as NavTab,
@@ -113,8 +113,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'notifications' as NavTab,
       label: 'Notifikasi WA & Email',
       icon: BellRing,
-      badge: 'Auto Sync',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300'
+      badge: lowStockCount > 0 ? `${lowStockCount} alert` : 'Auto Sync',
+      badgeColor: lowStockCount > 0 ? 'bg-amber-500 text-zinc-950 font-bold' : 'bg-emerald-500/20 text-emerald-300'
     },
     {
       id: 'settings' as NavTab,

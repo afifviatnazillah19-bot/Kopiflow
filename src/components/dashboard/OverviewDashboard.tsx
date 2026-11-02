@@ -78,13 +78,22 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onOpenNewBatchModal}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 transition-colors shrink-0"
-            >
-              <Layers className="h-3.5 w-3.5" />
-              <span>+ Intake Lot Baru</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => onNavigate('notifications')}
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors shrink-0"
+                title="Buka Pusat Notifikasi untuk kirim WA & Email stok kritis"
+              >
+                <span>Kirim Alert WA/Email</span>
+              </button>
+              <button
+                onClick={onOpenNewBatchModal}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 transition-colors shrink-0"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>+ Intake Lot Baru</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

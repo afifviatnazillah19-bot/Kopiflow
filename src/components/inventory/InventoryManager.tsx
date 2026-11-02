@@ -11,10 +11,19 @@ import {
   RefreshCw,
   Coins,
   Search,
-  Scale
+  Scale,
+  MessageCircle,
+  Mail
 } from 'lucide-react';
 import { CoffeeBean, CoffeeProcess, CoffeeGrade, PricingTier } from '../../types/erp';
-import { formatIDR, saveBean, updateBeanStock } from '../../services/dbService';
+import {
+  formatIDR,
+  saveBean,
+  updateBeanStock,
+  getNotificationConfig,
+  buildSingleBeanLowStockMessage,
+  saveNotificationLog
+} from '../../services/dbService';
 
 interface InventoryManagerProps {
   beans: CoffeeBean[];
@@ -328,27 +337,77 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                       </div>
                     </td>
 
-                    {/* Status Badge */}
+                    {/* Status Badge & Direct Alerts */}
                     <td className="py-3 px-3">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          isLow
-                            ? 'bg-red-100 text-red-800 border border-red-200'
-                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        }`}
-                      >
-                        {isLow ? (
-                          <>
-                            <AlertTriangle className="h-3 w-3" />
-                            <span>Kritis / Menipis</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="h-3 w-3" />
-                            <span>Aman</span>
-                          </>
+                      <div className="space-y-1">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            isLow
+                              ? 'bg-red-100 text-red-800 border border-red-200'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}
+                        >
+                          {isLow ? (
+                            <>
+                              <AlertTriangle className="h-3 w-3" />
+                              <span>Stok Kritis</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="h-3 w-3" />
+                              <span>Aman</span>
+                            </>
+                          )}
+                        </span>
+                        {isLow && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={async () => {
+                                const cfg = getNotificationConfig();
+                                const { whatsappUrl, subject, body } = buildSingleBeanLowStockMessage(bean, cfg);
+                                await saveNotificationLog({
+                                  id: `notif-wa-${bean.id}-${Date.now().toString(36)}`,
+                                  channel: 'WhatsApp',
+                                  recipient: cfg.businessWhatsApp,
+                                  subject,
+                                  messagePreview: body.slice(0, 200) + '...',
+                                  type: 'Stock Alert',
+                                  status: 'Sent',
+                                  sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                                  createdAt: new Date().toISOString()
+                                });
+                                window.open(whatsappUrl, '_blank');
+                              }}
+                              className="inline-flex items-center gap-0.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white hover:bg-emerald-700 shadow-2xs"
+                              title="Kirim pesan WhatsApp peringatan stok menipis"
+                            >
+                              <MessageCircle className="h-2.5 w-2.5" /> WA
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const cfg = getNotificationConfig();
+                                const { mailtoUrl, subject, body } = buildSingleBeanLowStockMessage(bean, cfg);
+                                await saveNotificationLog({
+                                  id: `notif-mail-${bean.id}-${Date.now().toString(36)}`,
+                                  channel: 'Email',
+                                  recipient: cfg.businessEmail,
+                                  subject,
+                                  messagePreview: body.slice(0, 200) + '...',
+                                  type: 'Stock Alert',
+                                  status: 'Sent',
+                                  sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                                  createdAt: new Date().toISOString()
+                                });
+                                window.location.href = mailtoUrl;
+                              }}
+                              className="inline-flex items-center gap-0.5 rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white hover:bg-blue-700 shadow-2xs"
+                              title="Kirim email bisnis peringatan stok"
+                            >
+                              <Mail className="h-2.5 w-2.5" /> Email
+                            </button>
+                          </div>
                         )}
-                      </span>
+                      </div>
                     </td>
 
                     {/* Action */}
