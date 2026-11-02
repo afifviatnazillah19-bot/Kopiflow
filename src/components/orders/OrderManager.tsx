@@ -269,7 +269,11 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
       .map((it) => `• ${it.beanName} (${it.type}) - ${it.quantityKg} kg @ ${formatIDR(it.unitPrice)} = ${formatIDR(it.subtotal)}`)
       .join('\n');
 
-    const msg = `*FAKTUR PENJUALAN KOPIFLOW WAREHOUSE*\n\n` +
+    const bankListStr = (qrisConfig.alternativeBankAccounts && qrisConfig.alternativeBankAccounts.length > 0)
+      ? qrisConfig.alternativeBankAccounts.map((b) => `• ${b.bankName}: ${b.accountNumber} a.n ${b.accountHolder}${b.isPrimary ? ' (Utama)' : ''}`).join('\n')
+      : `• Bank Mandiri: 137-00-19283-009\n• BCA: 872-0091-233\nA/N: ${qrisConfig.accountHolder || 'PT Kofiara Nusantara Berjaya'}`;
+
+    const msg = `*FAKTUR PENJUALAN KOFIARA HUB LHOKSEUMAWE*\n\n` +
       `No. Invoice: *${order.invoiceNumber}*\n` +
       `Pelanggan: *${order.customerName}* (Tier: *${order.customerType}*)\n` +
       `Tanggal: ${order.orderDate}\n` +
@@ -279,8 +283,8 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
       `Ongkir: ${formatIDR(order.shippingCost)}\n` +
       `*TOTAL PEMBAYARAN: ${formatIDR(order.grandTotal)}*\n` +
       `Status Pembayaran: *${order.paymentStatus}*\n\n` +
-      `Rekening Pembayaran:\n` +
-      `BCA: 872-0091-233 a.n PT KopiFlow Nusantara\n` +
+      `*Rekening Pembayaran Resmi:*\n` +
+      `${bankListStr}\n\n` +
       `Terima kasih atas kerja samanya!`;
 
     const url = buildWhatsAppLink(order.customerPhone, msg);
@@ -651,11 +655,26 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                     </div>
 
                     <div className="pt-1.5 border-t border-zinc-200/80 text-[11px] text-zinc-600">
-                      <strong>Rekening Bank Alternatif:</strong>
-                      <br />
-                      Bank Mandiri: <strong>137-00-19283-009</strong> | BCA: <strong>872-0091-233</strong>
-                      <br />
-                      A/N: <strong>{qrisConfig.accountHolder || 'PT KopiFlow Indonesia Berjaya'}</strong>
+                      <strong className="text-zinc-800">Rekening Bank Alternatif Transfer:</strong>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        {(qrisConfig.alternativeBankAccounts && qrisConfig.alternativeBankAccounts.length > 0) ? (
+                          qrisConfig.alternativeBankAccounts.map((bank) => (
+                            <span key={bank.id} className="text-zinc-700">
+                              {bank.bankName}: <strong className="font-mono text-zinc-950">{bank.accountNumber}</strong>{' '}
+                              <span className="text-[10px] text-zinc-500">(a.n {bank.accountHolder})</span>
+                              {bank.isPrimary && (
+                                <span className="ml-1 text-[9px] font-bold text-blue-700 bg-blue-50 px-1 rounded">
+                                  Utama
+                                </span>
+                              )}
+                            </span>
+                          ))
+                        ) : (
+                          <span>
+                            Bank Mandiri: <strong>137-00-19283-009</strong> | BCA: <strong>872-0091-233</strong> (a.n {qrisConfig.accountHolder || 'PT Kofiara Nusantara Berjaya'})
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

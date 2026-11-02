@@ -12,7 +12,11 @@ import {
   FileText,
   Building2,
   Copy,
-  Check
+  Check,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Edit2
 } from 'lucide-react';
 import { Shipment, Order } from '../../types/erp';
 import { formatIDR } from '../../services/dbService';
@@ -33,6 +37,7 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
 }) => {
   const [templateType, setTemplateType] = useState<'label' | 'suratJalan'>('label');
   const [copied, setCopied] = useState(false);
+  const [isCustomizingDetails, setIsCustomizingDetails] = useState(true);
 
   // Default Sender (Pengirim)
   const [senderName, setSenderName] = useState('KOFIARA HUB LHOKSEUMAWE');
@@ -58,24 +63,60 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
     shipment?.notes || order?.notes || 'Titip di loket tujuan, pengambilan dengan membawa KTP / resi.'
   );
 
-  // Logistics & Expedisi
+  // Logistics & Expedisi Helper to avoid hardcoded L300 when order is Grab or internal
+  const getInitialLogistics = () => {
+    const rawMethod = shipment?.courierName || order?.shippingMethod || '';
+    let vPlate = shipment?.vehiclePlate || '';
+    let dInfo = shipment?.driverName
+      ? `${shipment.driverName} (${shipment.driverPhone || '-'})`
+      : '';
+    let cName = shipment?.courierName || order?.shippingMethod || 'Loket Bus / L300 Aceh';
+    let sType = shipment?.serviceType || 'Angkutan Antar Kota / Kargo';
+    let lDest = shipment?.loketDestination || order?.customerAddress || 'Loket Terminal Batoh Banda Aceh';
+
+    if (rawMethod.includes('GrabExpress') || rawMethod.includes('Grab')) {
+      const match = rawMethod.match(/GrabExpress:\s*(.*?)\s*\((.*?)\s*-\s*(.*?)\)/i);
+      vPlate = match ? match[2].trim() : 'Motor Driver Grab';
+      dInfo = match ? `${match[1].trim()} (${match[3].trim()})` : 'Driver GrabExpress';
+      cName = 'GrabExpress Instan (Lhokseumawe)';
+      sType = 'Kurir Instan GrabExpress';
+      lDest = order?.customerAddress || 'Pengantaran Langsung ke Alamat Pelanggan';
+    } else if (
+      rawMethod.includes('Antar Sendiri') ||
+      rawMethod.includes('Kurir Roastery') ||
+      rawMethod.includes('krew')
+    ) {
+      vPlate = 'BL 1024 LF (Armada Roastery Kofiara)';
+      dInfo = 'Krew Gudang Kofiara (PIC: Tgk. Mansur)';
+      cName = 'Kurir Roastery Kofiara Hub Lhokseumawe';
+      sType = 'Pengantaran Internal Krew Gudang';
+      lDest = order?.customerAddress || 'Pengantaran Langsung ke Alamat Pelanggan';
+    } else if (rawMethod.includes('Ambil di Gudang') || rawMethod.includes('Pickup')) {
+      vPlate = 'Diambil Sendiri oleh Pembeli';
+      dInfo = 'Pembeli / Customer';
+      cName = 'Ambil Sendiri di Gudang (Pickup Direct)';
+      sType = 'Pickup Mandiri di Gudang';
+      lDest = 'Kofiara Hub Lhokseumawe (Gudang Mon Geudong)';
+    } else if (!vPlate) {
+      vPlate = 'BL 1482 AB (L300 Aceh)';
+      dInfo = 'Bang Irwan (0812-6900-1122)';
+    }
+
+    return { vPlate, dInfo, cName, sType, lDest };
+  };
+
+  const initialLogistics = getInitialLogistics();
+
   const defaultTracking =
     shipment?.trackingNumber ||
     `RESI-${order?.invoiceNumber?.replace('/', '-') || Math.floor(100000 + Math.random() * 900000)}`;
-  const defaultCourier = shipment?.courierName || order?.shippingMethod || 'Loket L300 Mentari Kargo Gayo';
-  const defaultService = shipment?.serviceType || 'Angkutan Antar Kota / Kargo';
-  const defaultLoketDest = shipment?.loketDestination || 'Loket Terminal Batoh Banda Aceh';
-  const defaultVehicle = shipment?.vehiclePlate || 'BL 1482 AB (L300 Putih)';
-  const defaultDriver = shipment?.driverName
-    ? `${shipment.driverName} (${shipment.driverPhone || '-'})`
-    : 'Bang Irwan (0812-6900-1122)';
 
   const [trackingNumber, setTrackingNumber] = useState(defaultTracking);
-  const [courierName, setCourierName] = useState(defaultCourier);
-  const [serviceType, setServiceType] = useState(defaultService);
-  const [loketDestination, setLoketDestination] = useState(defaultLoketDest);
-  const [vehiclePlate, setVehiclePlate] = useState(defaultVehicle);
-  const [driverInfo, setDriverInfo] = useState(defaultDriver);
+  const [courierName, setCourierName] = useState(initialLogistics.cName);
+  const [serviceType, setServiceType] = useState(initialLogistics.sType);
+  const [loketDestination, setLoketDestination] = useState(initialLogistics.lDest);
+  const [vehiclePlate, setVehiclePlate] = useState(initialLogistics.vPlate);
+  const [driverInfo, setDriverInfo] = useState(initialLogistics.dInfo);
 
   // Cargo Info
   const defaultWeight = shipment?.weightKg || order?.totalWeightKg || 25;
@@ -89,14 +130,17 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
 
   // Sync when prop updates & read warehouse head from local cache
   React.useEffect(() => {
-    // Load warehouse head staff from cache if available
+    let currentWhContact = 'Tgk. Mansur (Kepala Gudang)';
+    let currentWhPhone = '0812-6900-3344';
     try {
       const whCached = localStorage.getItem('kopiflow_erp_warehouse_head');
       if (whCached) {
         const whList = JSON.parse(whCached);
         if (whList && whList.length > 0) {
-          setSenderContact(`${whList[0].name} (Kepala Gudang)`);
-          setSenderPhone(whList[0].phone);
+          currentWhContact = `${whList[0].name} (Kepala Gudang)`;
+          currentWhPhone = whList[0].phone;
+          setSenderContact(currentWhContact);
+          setSenderPhone(currentWhPhone);
         }
       }
     } catch {
@@ -125,22 +169,57 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
       setRecipientAddress(order.customerAddress);
       setTrackingNumber(`RESI-${order.invoiceNumber.replace('/', '-')}`);
       setWeightKg(order.totalWeightKg);
-      if (order.shippingMethod) {
-        setCourierName(order.shippingMethod);
-        if (order.shippingMethod.includes('GrabExpress')) {
-          setServiceType('Kurir Instan GrabExpress');
-          setLoketDestination('Pengantaran Langsung ke Alamat (GrabExpress)');
-          // Parse driver info if formatted as GrabExpress: Name (Plate - Phone)
-          setDriverInfo(order.shippingMethod);
-        } else if (order.shippingMethod.includes('Ambil di Gudang')) {
-          setServiceType('Pickup Direct / Ambil Sendiri');
-          setLoketDestination('Kofiara Hub Lhokseumawe (Pickup)');
-          setDriverInfo('Diambil Sendiri oleh Pelanggan');
+
+      const rawMethod = order.shippingMethod || '';
+      if (rawMethod.includes('GrabExpress') || rawMethod.includes('Grab')) {
+        setCourierName('GrabExpress Instan (Lhokseumawe)');
+        setServiceType('Kurir Instan GrabExpress');
+        setLoketDestination(order.customerAddress || 'Pengantaran Langsung ke Alamat Pelanggan');
+
+        // Regex to extract driver name, vehicle plate, and phone:
+        // Format: "GrabExpress: Rudi Kurniawan (BL 4920 LA - 0822-7711-9988)"
+        const match = rawMethod.match(/GrabExpress:\s*(.*?)\s*\((.*?)\s*-\s*(.*?)\)/i);
+        if (match) {
+          const dName = match[1].trim();
+          const vPlate = match[2].trim();
+          const dPhone = match[3].trim();
+          setDriverInfo(`${dName} (${dPhone})`);
+          setVehiclePlate(vPlate || 'Motor Driver Grab');
         } else {
-          setServiceType('Angkutan Antar Kota / Kargo Loket');
-          setLoketDestination(order.customerAddress);
+          setDriverInfo(rawMethod);
+          setVehiclePlate('Motor Driver Grab');
         }
+      } else if (
+        rawMethod.includes('Antar Sendiri') ||
+        rawMethod.includes('Kurir Roastery') ||
+        rawMethod.includes('krew')
+      ) {
+        setCourierName('Kurir Roastery Kofiara Hub Lhokseumawe');
+        setServiceType('Pengantaran Internal Krew Gudang');
+        setLoketDestination(order.customerAddress || 'Pengantaran Langsung ke Alamat Pelanggan');
+        setVehiclePlate('BL 1024 LF (Armada Roastery Kofiara)');
+        setDriverInfo(`Krew Gudang Kofiara (PIC: ${currentWhContact})`);
+      } else if (rawMethod.includes('Ambil di Gudang') || rawMethod.includes('Pickup')) {
+        setCourierName('Ambil Sendiri di Gudang (Pickup Direct)');
+        setServiceType('Pickup Mandiri di Gudang');
+        setLoketDestination('Kofiara Hub Lhokseumawe (Gudang Mon Geudong)');
+        setVehiclePlate('Diambil Sendiri oleh Pembeli');
+        setDriverInfo('Pembeli / Customer');
+      } else if (rawMethod.includes('Loket Bus / L300') || rawMethod.includes('Loket')) {
+        setCourierName(rawMethod);
+        setServiceType('Angkutan Antar Kota Loket Bus / L300');
+        setLoketDestination(order.customerAddress || 'Loket Terminal Batoh Banda Aceh');
+        setVehiclePlate('BL 1482 AB (L300 Putih Sinar Gayo)');
+        setDriverInfo('Supir Loket Bus / L300');
+      } else {
+        // Ekspedisi kargo / JNT / JNE / Lion / Indah Cargo
+        setCourierName(rawMethod || 'Ekspedisi Kargo Antarpulau');
+        setServiceType('Ekspedisi Kargo');
+        setLoketDestination(order.customerAddress || 'Alamat Tujuan');
+        setVehiclePlate('Armada Ekspedisi Kargo');
+        setDriverInfo('Kurir Ekspedisi');
       }
+
       if (order.items && order.items.length > 0) {
         setContentsDesc(order.items.map((i) => `${i.beanName} (${i.quantityKg}kg)`).join(', '));
       }
@@ -268,6 +347,164 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
           <span className="text-[11px] text-amber-800 italic">
             (Pilih daerah di atas untuk mengisi alamat & loket tujuan secara otomatis)
           </span>
+        </div>
+
+        {/* Quick Edit Bar for Delivery Details & Notes - Hidden on Print */}
+        <div className="px-5 py-3.5 bg-zinc-50 border-b border-zinc-200 print:hidden space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-amber-700" />
+              <span className="font-bold text-xs text-zinc-900">
+                Sesuaikan Rincian Label, Catatan, Armada & Driver
+              </span>
+              <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-semibold">
+                Live Edit (Otomatis Update ke Label & Surat Jalan)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCustomizingDetails(!isCustomizingDetails)}
+              className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 flex items-center gap-1 cursor-pointer"
+            >
+              <span>{isCustomizingDetails ? 'Sembunyikan Form Edit' : 'Buka Form Edit'}</span>
+              {isCustomizingDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          {isCustomizingDetails && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs pt-1">
+              {/* Field 1: Catatan Pengiriman (Bisa Diubah) */}
+              <div className="lg:col-span-2 space-y-1">
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <label className="font-bold text-zinc-700 text-[11px] flex items-center gap-1">
+                    <Edit2 className="h-3 w-3 text-amber-700" />
+                    <span>Catatan Khusus Pengiriman (Bisa Diubah Langsung):</span>
+                  </label>
+                  <div className="flex gap-1 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientNotes('Titip di loket tujuan, pengambilan dengan membawa KTP & resi.')}
+                      className="text-[9px] bg-white border border-zinc-200 px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100 font-medium"
+                    >
+                      + Titip Loket
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientNotes('Hubungi penerima via WA/telepon saat driver sudah dekat / di lokasi.')}
+                      className="text-[9px] bg-white border border-zinc-200 px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100 font-medium"
+                    >
+                      + Hubungi Penerima
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientNotes('Kopi fresh roast, jangan dibanting & jauhkan dari air hujan.')}
+                      className="text-[9px] bg-white border border-zinc-200 px-1.5 py-0.5 rounded text-zinc-600 hover:bg-zinc-100 font-medium"
+                    >
+                      + Fragile Kopi
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={recipientNotes}
+                  onChange={(e) => setRecipientNotes(e.target.value)}
+                  placeholder="Ketik catatan pengiriman di sini..."
+                  className="w-full rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 font-medium focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Field 2: Armada / Plat Kendaraan */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-zinc-700 text-[11px]">Mobil / Plat Armada:</label>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setVehiclePlate('Motor Driver Grab')}
+                      className="text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded font-bold"
+                    >
+                      Grab
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVehiclePlate('BL 1024 LF (Kofiara Roastery)')}
+                      className="text-[9px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold"
+                    >
+                      Krew Kofiara
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={vehiclePlate}
+                  onChange={(e) => setVehiclePlate(e.target.value)}
+                  placeholder="cth: BL 4920 LA / BL 1024 LF"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-mono font-bold text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Field 3: Supir / Driver / Kurir */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-zinc-700 text-[11px]">Supir / Driver / Kurir:</label>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setDriverInfo(`Krew Gudang Kofiara (PIC: ${senderContact})`)}
+                      className="text-[9px] bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.5 rounded font-bold"
+                    >
+                      Krew Gudang
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={driverInfo}
+                  onChange={(e) => setDriverInfo(e.target.value)}
+                  placeholder="cth: Rudi Kurniawan (0822-...) / Krew Gudang"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 font-medium focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Field 4: Loket / Titik Pengambilan */}
+              <div className="lg:col-span-2 space-y-1">
+                <label className="font-bold text-zinc-700 text-[11px]">
+                  Loket / Pool / Titik Pengambilan:
+                </label>
+                <input
+                  type="text"
+                  value={loketDestination}
+                  onChange={(e) => setLoketDestination(e.target.value)}
+                  placeholder="cth: Loket Terminal Batoh / Diantar Langsung ke Alamat"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 font-medium focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Field 5: No Resi / Manifest */}
+              <div className="space-y-1">
+                <label className="font-bold text-zinc-700 text-[11px]">No. Resi / Manifest:</label>
+                <input
+                  type="text"
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  placeholder="RESI-12345"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-mono font-bold text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Field 6: Nama Ekspedisi / Kurir */}
+              <div className="space-y-1">
+                <label className="font-bold text-zinc-700 text-[11px]">Nama Ekspedisi / Kurir:</label>
+                <input
+                  type="text"
+                  value={courierName}
+                  onChange={(e) => setCourierName(e.target.value)}
+                  placeholder="GrabExpress / Loket Sinar Gayo"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 font-medium focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Printable Area */}

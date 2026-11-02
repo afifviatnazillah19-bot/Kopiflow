@@ -36,9 +36,12 @@ import {
   ShoppingBag,
   FileText,
   BadgeAlert,
-  Wallet
+  Wallet,
+  Plus,
+  Trash2,
+  Edit2
 } from 'lucide-react';
-import { CoffeeBean, PricingTier, QrisPaymentConfig, Order, PaymentStatus } from '../../types/erp';
+import { CoffeeBean, PricingTier, QrisPaymentConfig, Order, PaymentStatus, BankAccountItem } from '../../types/erp';
 import {
   formatIDR,
   saveBean,
@@ -83,6 +86,14 @@ export const FinanceAndPricing: React.FC<FinanceAndPricingProps> = ({
 
   // Selected Order for Quick Pay / QRIS Scan Modal
   const [selectedOrderForPay, setSelectedOrderForPay] = useState<Order | null>(null);
+
+  // Alternative Bank Accounts state & modal
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const [bankNameInput, setBankNameInput] = useState('Bank Mandiri');
+  const [bankAccNumberInput, setBankAccNumberInput] = useState('');
+  const [bankAccHolderInput, setBankAccHolderInput] = useState('');
+  const [bankIsPrimaryInput, setBankIsPrimaryInput] = useState(false);
 
   // Payment Tracker Filter & Search State
   const [paymentSearch, setPaymentSearch] = useState('');
@@ -317,6 +328,92 @@ export const FinanceAndPricing: React.FC<FinanceAndPricingProps> = ({
     setTimeout(() => setCopiedBank(false), 2000);
   };
 
+  // Bank Account Handlers (Add, Edit, Delete, Toggle Primary)
+  const handleOpenAddBank = () => {
+    setEditingBankId(null);
+    setBankNameInput('Bank Mandiri');
+    setBankAccNumberInput('');
+    setBankAccHolderInput(qrisConfig.accountHolder || 'PT Kofiara Nusantara Berjaya');
+    setBankIsPrimaryInput(false);
+    setIsBankModalOpen(true);
+  };
+
+  const handleOpenEditBank = (b: BankAccountItem) => {
+    setEditingBankId(b.id);
+    setBankNameInput(b.bankName);
+    setBankAccNumberInput(b.accountNumber);
+    setBankAccHolderInput(b.accountHolder);
+    setBankIsPrimaryInput(!!b.isPrimary);
+    setIsBankModalOpen(true);
+  };
+
+  const handleSaveBankAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bankNameInput || !bankAccNumberInput) return;
+
+    let currentList = qrisConfig.alternativeBankAccounts || [];
+
+    if (editingBankId) {
+      currentList = currentList.map((item) => {
+        if (item.id === editingBankId) {
+          return {
+            ...item,
+            bankName: bankNameInput,
+            accountNumber: bankAccNumberInput,
+            accountHolder: bankAccHolderInput || qrisConfig.accountHolder,
+            isPrimary: bankIsPrimaryInput
+          };
+        }
+        return bankIsPrimaryInput ? { ...item, isPrimary: false } : item;
+      });
+    } else {
+      const newAcc: BankAccountItem = {
+        id: `bank-${Date.now()}`,
+        bankName: bankNameInput,
+        accountNumber: bankAccNumberInput,
+        accountHolder: bankAccHolderInput || qrisConfig.accountHolder,
+        isPrimary: bankIsPrimaryInput
+      };
+      if (bankIsPrimaryInput) {
+        currentList = currentList.map((item) => ({ ...item, isPrimary: false }));
+      }
+      currentList = [...currentList, newAcc];
+    }
+
+    const updatedConfig: QrisPaymentConfig = {
+      ...qrisConfig,
+      alternativeBankAccounts: currentList,
+      updatedAt: new Date().toISOString()
+    };
+
+    setQrisConfig(updatedConfig);
+    await saveQrisConfig(updatedConfig);
+    setIsBankModalOpen(false);
+    setQrisSuccessToast(editingBankId ? 'Data rekening bank berhasil diperbarui!' : 'Rekening bank baru berhasil ditambahkan!');
+    setQrisSaveSuccess(true);
+    setTimeout(() => {
+      setQrisSaveSuccess(false);
+      setQrisSuccessToast('');
+    }, 4000);
+  };
+
+  const handleDeleteBankAccount = async (id: string) => {
+    const currentList = (qrisConfig.alternativeBankAccounts || []).filter((b) => b.id !== id);
+    const updatedConfig: QrisPaymentConfig = {
+      ...qrisConfig,
+      alternativeBankAccounts: currentList,
+      updatedAt: new Date().toISOString()
+    };
+    setQrisConfig(updatedConfig);
+    await saveQrisConfig(updatedConfig);
+    setQrisSuccessToast('Rekening bank berhasil dihapus.');
+    setQrisSaveSuccess(true);
+    setTimeout(() => {
+      setQrisSaveSuccess(false);
+      setQrisSuccessToast('');
+    }, 3500);
+  };
+
   // Handle direct payment status change
   const handleUpdatePaymentStatus = async (orderId: string, newStatus: PaymentStatus) => {
     try {
@@ -337,13 +434,17 @@ export const FinanceAndPricing: React.FC<FinanceAndPricingProps> = ({
     const isLunas = order.paymentStatus === 'Paid in Full';
     const isDP = order.paymentStatus === 'Down Payment';
 
+    const bankListStr = (qrisConfig.alternativeBankAccounts && qrisConfig.alternativeBankAccounts.length > 0)
+      ? qrisConfig.alternativeBankAccounts.map((b) => `• ${b.bankName}: ${b.accountNumber} a.n ${b.accountHolder}${b.isPrimary ? ' (Utama)' : ''}`).join('\n')
+      : `• Bank Mandiri: 137-00-19283-009 / BCA: 872-0091-233\nA/N: ${qrisConfig.accountHolder || 'PT Kofiara Nusantara Berjaya'}`;
+
     let text = '';
     if (isLunas) {
-      text = `*BUKTI PEMBAYARAN LUNAS KOPIFLOW ROASTERY*\n\nYth. ${order.customerName},\nTerima kasih! Pembayaran untuk Faktur *${order.invoiceNumber}* sebesar *${formatIDR(order.grandTotal)}* telah kami terima LUNAS.\n\nPesanan sedang dipersiapkan untuk pengiriman ke ${order.destinationIsland}.\nSalam hangat,\n*KopiFlow Roastery Gayo*`;
+      text = `*BUKTI PEMBAYARAN LUNAS KOFIARA ROASTERY*\n\nYth. ${order.customerName},\nTerima kasih! Pembayaran untuk Faktur *${order.invoiceNumber}* sebesar *${formatIDR(order.grandTotal)}* telah kami terima LUNAS.\n\nPesanan sedang dipersiapkan untuk pengiriman ke ${order.destinationIsland}.\nSalam hangat,\n*Kofiara Hub Lhokseumawe*`;
     } else if (isDP) {
-      text = `*INFORMASI PEMBAYARAN DP KOPIFLOW ROASTERY*\n\nYth. ${order.customerName},\nPembayaran Uang Muka (DP) untuk Faktur *${order.invoiceNumber}* telah kami catat. Total tagihan: *${formatIDR(order.grandTotal)}*.\n\nSisa tagihan dapat diselesaikan via scan QRIS GoPay saat barang tiba atau sebelum pengiriman antarpulau.\nTerima kasih!`;
+      text = `*INFORMASI PEMBAYARAN DP KOFIARA ROASTERY*\n\nYth. ${order.customerName},\nPembayaran Uang Muka (DP) untuk Faktur *${order.invoiceNumber}* telah kami catat. Total tagihan: *${formatIDR(order.grandTotal)}*.\n\nSisa tagihan dapat diselesaikan via scan QRIS GoPay saat barang tiba atau transfer sebelum dispatch.\nTerima kasih!`;
     } else {
-      text = `*TAGIHAN PEMBAYARAN FAKTUR KOPIFLOW ROASTERY*\n\nYth. ${order.customerName},\nBerikut rincian tagihan pesanan kopi Anda:\n• No. Faktur: *${order.invoiceNumber}*\n• Total Tagihan: *${formatIDR(order.grandTotal)}*\n• Tujuan: ${order.customerAddress} (${order.destinationIsland})\n\nSilakan lakukan pembayaran cepat via QRIS GoPay dengan scan barcode QRIS kami atau transfer ke:\nBank Mandiri: 137-00-19283-009 / BCA: 872-0091-233\nA/N: ${qrisConfig.accountHolder || 'PT KopiFlow Indonesia Berjaya'}\n\nKonfirmasikan bukti bayar setelah transfer. Terima kasih!`;
+      text = `*TAGIHAN PEMBAYARAN FAKTUR KOFIARA ROASTERY*\n\nYth. ${order.customerName},\nBerikut rincian tagihan pesanan kopi Anda:\n• No. Faktur: *${order.invoiceNumber}*\n• Total Tagihan: *${formatIDR(order.grandTotal)}*\n• Tujuan: ${order.customerAddress} (${order.destinationIsland})\n\nSilakan lakukan pembayaran cepat via QRIS GoPay dengan scan barcode QRIS kami atau transfer ke rekening resmi kami:\n${bankListStr}\n\nKonfirmasikan bukti bayar setelah transfer. Terima kasih!`;
     }
 
     saveNotificationLog({
@@ -1398,7 +1499,221 @@ export const FinanceAndPricing: React.FC<FinanceAndPricingProps> = ({
                 </form>
               </div>
             </div>
+
+            {/* Card: Manajemen Rekening Bank Alternatif */}
+            <div className="lg:col-span-12 rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                      Rekening Bank Alternatif (Transfer Manual / m-Banking)
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                        {(qrisConfig.alternativeBankAccounts || []).length} Rekening Terdaftar
+                      </span>
+                    </h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Kelola daftar rekening bank yang dicantumkan pada Faktur Penjualan, pesan WhatsApp invoice, dan standee kasir
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddBank}
+                  className="flex items-center gap-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white px-3.5 py-2 text-xs font-bold transition-colors shadow-2xs shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>+ Tambah Rekening Bank</span>
+                </button>
+              </div>
+
+              {/* Bank Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(qrisConfig.alternativeBankAccounts && qrisConfig.alternativeBankAccounts.length > 0) ? (
+                  qrisConfig.alternativeBankAccounts.map((b) => (
+                    <div
+                      key={b.id}
+                      className={`rounded-xl border p-4 space-y-2.5 transition-all ${
+                        b.isPrimary
+                          ? 'border-blue-300 bg-blue-50/40 shadow-xs'
+                          : 'border-zinc-200 bg-zinc-50/50 hover:border-zinc-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-zinc-900">{b.bankName}</span>
+                          {b.isPrimary && (
+                            <span className="rounded bg-blue-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 uppercase tracking-wider">
+                              Utama
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditBank(b)}
+                            className="p-1 text-zinc-500 hover:text-blue-700 hover:bg-white rounded transition-colors"
+                            title="Edit Rekening Ini"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBankAccount(b.id)}
+                            className="p-1 text-zinc-400 hover:text-rose-700 hover:bg-white rounded transition-colors"
+                            title="Hapus Rekening"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-zinc-200">
+                        <div>
+                          <span className="text-[10px] text-zinc-400 block font-mono">No. Rekening:</span>
+                          <span className="font-mono font-bold text-sm text-zinc-950 tracking-wider">
+                            {b.accountNumber}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyBank(b.accountNumber)}
+                          className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-500 transition-colors"
+                          title="Salin Nomor Rekening"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="text-[11px] text-zinc-600 flex justify-between">
+                        <span className="text-zinc-500">Atas Nama:</span>
+                        <strong className="text-zinc-800">{b.accountHolder}</strong>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full py-8 text-center bg-zinc-50 border border-dashed border-zinc-300 rounded-xl">
+                    <p className="text-xs text-zinc-500">Belum ada rekening bank yang ditambahkan.</p>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddBank}
+                      className="mt-2 text-xs font-bold text-blue-700 hover:underline"
+                    >
+                      + Tambah Rekening Pertama
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Modal Tambah / Edit Rekening Bank */}
+          {isBankModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs">
+              <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                  <h3 className="text-sm font-bold text-zinc-900">
+                    {editingBankId ? 'Edit Data Rekening Bank' : 'Tambah Rekening Bank Baru'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsBankModalOpen(false)}
+                    className="text-zinc-400 hover:text-zinc-700 text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveBankAccount} className="mt-4 space-y-3.5 text-xs">
+                  <div>
+                    <label className="block font-semibold text-zinc-700 mb-1">Pilih Bank / Nama Bank</label>
+                    <div className="flex gap-1.5 mb-2 flex-wrap">
+                      {['Bank Mandiri', 'BCA (Bank Central Asia)', 'Bank Syariah Indonesia (BSI)', 'Bank BRI', 'Bank BNI', 'Bank Aceh Syariah'].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setBankNameInput(preset)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                            bankNameInput === preset
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {preset.split(' ')[0]} {preset.includes('BSI') ? 'BSI' : preset.includes('BCA') ? 'BCA' : preset.includes('Aceh') ? 'Aceh' : ''}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={bankNameInput}
+                      onChange={(e) => setBankNameInput(e.target.value)}
+                      placeholder="cth: Bank Mandiri / BCA / BSI"
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-hidden font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-zinc-700 mb-1">Nomor Rekening</label>
+                    <input
+                      type="text"
+                      required
+                      value={bankAccNumberInput}
+                      onChange={(e) => setBankAccNumberInput(e.target.value)}
+                      placeholder="cth: 137-00-19283-009 / 8720091233"
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs font-mono font-bold text-zinc-950 focus:border-blue-600 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-zinc-700 mb-1">Atas Nama Pemilik Rekening (A/N)</label>
+                    <input
+                      type="text"
+                      required
+                      value={bankAccHolderInput}
+                      onChange={(e) => setBankAccHolderInput(e.target.value)}
+                      placeholder="cth: PT Kofiara Nusantara Berjaya"
+                      className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs focus:border-blue-600 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={bankIsPrimaryInput}
+                        onChange={(e) => setBankIsPrimaryInput(e.target.checked)}
+                        className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                      />
+                      <span className="font-semibold text-zinc-700 text-xs">
+                        Jadikan Rekening Utama (Ditampilkan Paling Atas di Invoice & Faktur)
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsBankModalOpen(false)}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:bg-zinc-50"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-blue-700 hover:bg-blue-800 px-4 py-1.5 font-bold text-white shadow-xs"
+                    >
+                      Simpan Data Rekening
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1519,11 +1834,19 @@ export const FinanceAndPricing: React.FC<FinanceAndPricingProps> = ({
                 {qrisConfig.paymentInstructions || 'Scan menggunakan GoPay, BCA, Mandiri, BRI, BSI, Dana, OVO, atau ShopeePay.'}
               </p>
               <div className="pt-2 border-t border-zinc-200 flex flex-wrap items-center justify-center gap-3 text-[11px] text-zinc-600">
-                <span>Mandiri: <strong>137-00-19283-009</strong></span>
-                <span>•</span>
-                <span>BCA: <strong>872-0091-233</strong></span>
-                <span>•</span>
-                <span>A/N: <strong>{qrisConfig.accountHolder || 'KopiFlow Roastery'}</strong></span>
+                {(qrisConfig.alternativeBankAccounts && qrisConfig.alternativeBankAccounts.length > 0) ? (
+                  qrisConfig.alternativeBankAccounts.map((b, idx) => (
+                    <React.Fragment key={b.id}>
+                      {idx > 0 && <span>•</span>}
+                      <span>
+                        {b.bankName}: <strong className="font-mono text-zinc-900">{b.accountNumber}</strong>{' '}
+                        <span className="text-[10px] text-zinc-500">(a.n {b.accountHolder})</span>
+                      </span>
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <span>A/N: <strong>{qrisConfig.accountHolder || 'Kofiara Roastery'}</strong></span>
+                )}
               </div>
             </div>
 

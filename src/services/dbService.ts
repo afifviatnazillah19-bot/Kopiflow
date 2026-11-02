@@ -991,11 +991,34 @@ export function formatIDR(amount: number): string {
 
 // QRIS & GoPay Configuration Management
 export const DEFAULT_QRIS_CONFIG: QrisPaymentConfig = {
-  merchantName: 'KopiFlow Roastery Gayo',
+  merchantName: 'Kofiara Roastery Lhokseumawe',
   qrisImageUrl: '', // User will upload their GoPay QRIS image
   gopayNumber: '0812-6900-8899',
-  accountHolder: 'KopiFlow Roastery - GoPay Bisnis',
+  accountHolder: 'Kofiara Roastery - Hub Lhokseumawe',
   paymentInstructions: 'Scan QRIS via aplikasi GoPay atau aplikasi m-Banking apa saja (BCA, Mandiri, BRI, BSI, Dana, OVO, ShopeePay). Masukkan nominal sesuai total tagihan faktur.',
+  alternativeBankAccounts: [
+    {
+      id: 'bank-mandiri',
+      bankName: 'Bank Mandiri',
+      accountNumber: '137-00-19283-009',
+      accountHolder: 'PT Kofiara Nusantara Berjaya',
+      isPrimary: true
+    },
+    {
+      id: 'bank-bca',
+      bankName: 'BCA (Bank Central Asia)',
+      accountNumber: '872-0091-233',
+      accountHolder: 'PT Kofiara Nusantara Berjaya',
+      isPrimary: false
+    },
+    {
+      id: 'bank-bsi',
+      bankName: 'Bank Syariah Indonesia (BSI)',
+      accountNumber: '714-8899-012',
+      accountHolder: 'Kofiara Roastery Hub Lhokseumawe',
+      isPrimary: false
+    }
+  ],
   updatedAt: new Date().toISOString()
 };
 
