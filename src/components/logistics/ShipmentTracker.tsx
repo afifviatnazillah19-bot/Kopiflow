@@ -18,6 +18,7 @@ import {
 import { Shipment, Order, IslandRegion, ShipmentStatus } from '../../types/erp';
 import { formatIDR, saveShipment, updateShipmentStatus, buildWhatsAppLink, saveNotificationLog } from '../../services/dbService';
 import { ShippingLabelModal } from './ShippingLabelModal';
+import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
 
 interface ShipmentTrackerProps {
   shipments: Shipment[];
@@ -53,6 +54,7 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
   const [vehiclePlate, setVehiclePlate] = useState<string>('BL 1482 AB (L300 Putih)');
   const [loketOrigin, setLoketOrigin] = useState<string>('Loket Terminal Paya Ilang Takengon');
   const [loketDestination, setLoketDestination] = useState<string>('Loket Batoh Banda Aceh');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('aceh-banda-aceh');
   const [estimatedDelivery, setEstimatedDelivery] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -513,6 +515,11 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
                     onChange={(e) => setCourierName(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-bold text-orange-950 focus:border-amber-500 focus:outline-hidden"
                   >
+                    <optgroup label="Kurir Instan, Antar Sendiri & Pickup Gudang">
+                      <option value="GrabExpress / GoSend Instan">GrabExpress / GoSend Instan (Lhokseumawe & Sekitar)</option>
+                      <option value="Antar Sendiri (Kurir Roastery Kofiara)">Antar Sendiri (Kurir Roastery Kofiara Hub)</option>
+                      <option value="Ambil di Gudang (Pickup Direct Lhokseumawe)">Ambil di Gudang (Pickup Direct Lhokseumawe)</option>
+                    </optgroup>
                     <optgroup label="Loket Angkutan Aceh (L300 / HiAce / Bus)">
                       <option value="Loket Simpati Star Kargo Takengon-Banda Aceh">
                         Loket Simpati Star Kargo (Takengon - B.Aceh / Medan)
@@ -534,14 +541,12 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
                       </option>
                       <option value="Loket PMTOH Kargo Aceh">Loket PMTOH Kargo Aceh</option>
                     </optgroup>
-                    <optgroup label="Ekspedisi Nasional & Kontainer Laut">
-                      <option value="Indah Logistik Kargo Antar Pulau">
-                        Indah Logistik Kargo (Laut)
-                      </option>
-                      <option value="Pelni Logistics (Kapal Laut Kargo)">
-                        Pelni Logistics (Kapal Laut)
-                      </option>
-                      <option value="JNE Trucking (JTR)">JNE Trucking (JTR)</option>
+                    <optgroup label="Ekspedisi Nasional & Kargo (JNT, JNE, Lion, Indah)">
+                      <option value="JNT Express (Kargo / Reguler)">JNT Express (Kargo & Reguler)</option>
+                      <option value="JNE Express (YES / REG / JTR)">JNE Express (YES, REG, JTR)</option>
+                      <option value="Lion Parcel (Bagan Kargo Udara)">Lion Parcel (Kargo Udara)</option>
+                      <option value="Indah Logistic Cargo">Indah Logistic Cargo (Darat & Laut)</option>
+                      <option value="Pelni Logistics (Kapal Laut Kargo)">Pelni Logistics (Kapal Laut)</option>
                       <option value="SiCepat Cargo Express">SiCepat Cargo Express</option>
                     </optgroup>
                   </select>
@@ -557,6 +562,41 @@ export const ShipmentTracker: React.FC<ShipmentTrackerProps> = ({
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
+              </div>
+
+              {/* Specific Regional Preset Quick Select */}
+              <div className="bg-orange-50/70 p-3 rounded-xl border border-orange-200 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-orange-950">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5 text-orange-700" />
+                    <span>Pilih Preset Region / Alamat Tujuan Spesifik</span>
+                  </span>
+                  <span className="text-[10px] text-orange-800 font-medium bg-orange-200 px-1.5 py-0.5 rounded">
+                    Otomatisasi Loket & Island
+                  </span>
+                </div>
+                <select
+                  value={selectedPresetId}
+                  onChange={(e) => {
+                    const presetId = e.target.value;
+                    setSelectedPresetId(presetId);
+                    const found = SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === presetId);
+                    if (found) {
+                      setDestinationIsland(found.island);
+                      const dist = found.districtList?.[0] || '';
+                      setDestinationRegion(`${dist ? dist + ', ' : ''}${found.cityRegency}, ${found.province}`);
+                      setLoketDestination(found.defaultHubLoket);
+                      setShippingCost(found.estimatedShippingFee);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-orange-300 bg-white px-2.5 py-1.5 text-xs text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                >
+                  {SPECIFIC_DESTINATION_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.province}] {p.cityRegency} - {p.districtList?.[0] || ''} ({p.island})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Loket Asal & Tujuan */}

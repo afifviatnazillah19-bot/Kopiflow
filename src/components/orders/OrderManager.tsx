@@ -16,9 +16,12 @@ import {
   CreditCard,
   Send,
   QrCode,
-  Package
+  Package,
+  MapPin,
+  Truck
 } from 'lucide-react';
 import { ShippingLabelModal } from '../logistics/ShippingLabelModal';
+import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
 import {
   Order,
   OrderItem,
@@ -27,7 +30,8 @@ import {
   IslandRegion,
   OrderStatus,
   PaymentStatus,
-  QrisPaymentConfig
+  QrisPaymentConfig,
+  Partner
 } from '../../types/erp';
 import {
   formatIDR,
@@ -44,6 +48,7 @@ import {
 interface OrderManagerProps {
   orders: Order[];
   beans: CoffeeBean[];
+  partners?: Partner[];
   onRefresh: () => void;
   onOpenNewOrderModal?: () => void;
 }
@@ -51,6 +56,7 @@ interface OrderManagerProps {
 export const OrderManager: React.FC<OrderManagerProps> = ({
   orders,
   beans,
+  partners = [],
   onRefresh
 }) => {
   const [search, setSearch] = useState('');
@@ -67,6 +73,9 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
   }, []);
 
   // New Order Form state
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerType, setCustomerType] = useState<PricingTier>('Lokal');
   const [customerPhone, setCustomerPhone] = useState('628123456789');
@@ -84,8 +93,15 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
       subtotal: (beans[0]?.priceLocalPerKg || 140000) * 20
     }
   ]);
+  const [shippingCategory, setShippingCategory] = useState<
+    'Loket Bus / L300' | 'Grab / GoSend / Kurir Instan' | 'Antar Sendiri (Kurir Roastery)' | 'Ambil di Gudang (Pickup Direct)' | 'Ekspedisi Kargo Antarpulau'
+  >('Loket Bus / L300');
+  const [grabDriverName, setGrabDriverName] = useState('');
+  const [grabVehiclePlate, setGrabVehiclePlate] = useState('');
+  const [grabDriverPhone, setGrabDriverPhone] = useState('');
+  const [grabOrderPin, setGrabOrderPin] = useState('');
   const [discount, setDiscount] = useState<number>(0);
-  const [shippingCost, setShippingCost] = useState<number>(75000);
+  const [shippingCost, setShippingCost] = useState<number>(35000);
   const [notes, setNotes] = useState('');
 
   React.useEffect(() => {
@@ -203,6 +219,10 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
       customerEmail: customerEmail || 'customer@kopiflow-client.com',
       customerAddress: customerAddress || 'Alamat Belum Diatur',
       destinationIsland,
+      shippingMethod:
+        shippingCategory === 'Grab / GoSend / Kurir Instan'
+          ? `GrabExpress: ${grabDriverName || 'Driver Grab'} (${grabVehiclePlate || 'Plat Motor'} - ${grabDriverPhone || '-'})`
+          : shippingCategory,
       items: orderItems,
       totalWeightKg,
       subtotal,
@@ -705,6 +725,45 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
             </div>
 
             <form onSubmit={handleCreateOrder} className="mt-4 space-y-4 text-xs">
+              {/* Partner Select Dropdown from Relations */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-amber-950 text-xs">
+                    Pilih Pelanggan / Mitra dari Database Relasi ({partners.length} Terdaftar)
+                  </label>
+                  <span className="rounded bg-amber-600 px-1.5 py-0.2 text-[9px] font-bold text-white uppercase">
+                    Relasi ERP
+                  </span>
+                </div>
+                <select
+                  value={selectedPartnerId}
+                  onChange={(e) => {
+                    const pid = e.target.value;
+                    setSelectedPartnerId(pid);
+                    const found = partners.find((p) => p.id === pid);
+                    if (found) {
+                      setCustomerName(found.name);
+                      if (found.phone) setCustomerPhone(found.phone);
+                      if (found.email) setCustomerEmail(found.email);
+                      if (found.address) setCustomerAddress(found.address);
+                      if (found.defaultPricingTier) handleCustomerTypeChange(found.defaultPricingTier);
+                      else if (found.category?.includes('UMKM')) handleCustomerTypeChange('UMKM');
+                      else if (found.category?.includes('Luar Pulau')) handleCustomerTypeChange('Luar Pulau');
+                      else handleCustomerTypeChange('Lokal');
+                    }
+                  }}
+                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-medium text-xs focus:border-amber-600 focus:outline-hidden"
+                >
+                  <option value="">-- Pilih dari Daftar Relasi Pelanggan --</option>
+                  {partners.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.type || p.category}] {p.name} - {p.phone || 'No Telp'} ({p.city || 'Kota'})
+                    </option>
+                  ))}
+                  <option value="custom">-- Ketik Customer Baru / Belum Terdaftar --</option>
+                </select>
+              </div>
+
               {/* Customer & Tier Selection */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -713,9 +772,12 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                     type="text"
                     required
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value);
+                      setSelectedPartnerId('');
+                    }}
                     placeholder="cth: Kopi Kenari / Rian Syahputra"
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden font-bold text-zinc-900"
                   />
                 </div>
 
@@ -768,41 +830,226 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
-                <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Pulau Tujuan</label>
-                  <select
-                    value={destinationIsland}
-                    onChange={(e) => {
-                      const isl = e.target.value as IslandRegion;
-                      setDestinationIsland(isl);
-                      // Adjust shipping cost estimate
-                      if (isl === 'Jawa') setShippingCost(75000);
-                      else if (isl === 'Sumatera' || isl === 'Bali & Nusa Tenggara') setShippingCost(280000);
-                      else if (isl === 'Kalimantan') setShippingCost(450000);
-                      else setShippingCost(650000);
-                    }}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
-                  >
-                    <option value="Jawa">Jawa</option>
-                    <option value="Sumatera">Sumatera</option>
-                    <option value="Kalimantan">Kalimantan</option>
-                    <option value="Sulawesi">Sulawesi</option>
-                    <option value="Bali & Nusa Tenggara">Bali & Nusa Tenggara</option>
-                    <option value="Maluku & Papua">Maluku & Papua</option>
-                  </select>
-                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">Alamat Lengkap Pengiriman</label>
-                <input
-                  type="text"
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  placeholder="Jl. Raya No..., Kota, Provinsi, Kode Pos"
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
-                />
+              {/* SHIPPING METHOD CATEGORY SELECTOR */}
+              <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-amber-950 text-xs flex items-center gap-1.5">
+                    <Truck className="h-4 w-4 text-amber-700" />
+                    <span>Metode Pengiriman (Opsi Jalur)</span>
+                  </label>
+                  <span className="rounded bg-amber-800 px-2 py-0.5 text-[10px] font-bold text-white uppercase">
+                    Kofiara Logistics
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'Loket Bus / L300', label: 'Loket Bus / L300', desc: 'Sinar Gayo, Mentari, Simpati Star' },
+                    { id: 'Grab / GoSend / Kurir Instan', label: 'Grab / GoSend Instan', desc: 'Isi Data Driver Grab' },
+                    { id: 'Antar Sendiri (Kurir Roastery)', label: 'Antar Sendiri (Kurir)', desc: 'Kurir Roastery Kofiara' },
+                    { id: 'Ambil di Gudang (Pickup Direct)', label: 'Ambil di Gudang', desc: 'Kofiara Hub Lhokseumawe (Rp 0)' }
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        const cat = m.id as typeof shippingCategory;
+                        setShippingCategory(cat);
+                        if (cat === 'Ambil di Gudang (Pickup Direct)') {
+                          setShippingCost(0);
+                          setCustomerAddress('Diambil Langsung di Kofiara Hub Lhokseumawe');
+                        } else if (cat === 'Grab / GoSend / Kurir Instan') {
+                          setShippingCost(20000);
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        shippingCategory === m.id
+                          ? 'border-amber-700 bg-amber-800 text-white font-bold shadow-xs'
+                          : 'border-amber-200 bg-white text-zinc-800 hover:border-amber-400'
+                      }`}
+                    >
+                      <div className="text-xs font-bold leading-tight">{m.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${shippingCategory === m.id ? 'text-amber-200' : 'text-zinc-500'}`}>
+                        {m.desc}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* GRAB DRIVER SPECIFIC FIELDS */}
+                {shippingCategory === 'Grab / GoSend / Kurir Instan' && (
+                  <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 space-y-2.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-950">
+                      <span className="flex items-center gap-1">
+                        <Truck className="h-4 w-4 text-emerald-700" />
+                        <span>Data Driver Grab / GoSend / Kurir Instan</span>
+                      </span>
+                      <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-bold">
+                        Driver Info
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
+                          Nama Driver Grab / Express
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={grabDriverName}
+                          onChange={(e) => setGrabDriverName(e.target.value)}
+                          placeholder="Rudi Kurniawan (GrabExpress)"
+                          className="w-full rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs focus:border-emerald-600 focus:outline-hidden"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
+                          No. Plat Motor / Mobil
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={grabVehiclePlate}
+                          onChange={(e) => setGrabVehiclePlate(e.target.value)}
+                          placeholder="BL 4920 LA (Vario Hitam)"
+                          className="w-full rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-mono focus:border-emerald-600 focus:outline-hidden"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
+                          No. HP / WA Driver
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={grabDriverPhone}
+                          onChange={(e) => setGrabDriverPhone(e.target.value)}
+                          placeholder="0822-7711-9988"
+                          className="w-full rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-mono focus:border-emerald-600 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* SPECIFIC REGIONAL DESTINATION SELECTION (Hanya tampil untuk Loket Bus/L300 & Ekspedisi Kargo) */}
+              {(shippingCategory === 'Loket Bus / L300' || shippingCategory === 'Ekspedisi Kargo Antarpulau') && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-blue-950 text-xs flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 text-blue-700" />
+                      <span>Pilih Kota & Kabupaten Tujuan Spesifik (Indonesia)</span>
+                    </label>
+                    <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase">
+                      Rute & Loket
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                        1. Provinsi & Kota / Kabupaten Tujuan
+                      </label>
+                      <select
+                        value={selectedPresetId}
+                        onChange={(e) => {
+                          const pid = e.target.value;
+                          setSelectedPresetId(pid);
+                          const preset = SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === pid);
+                          if (preset) {
+                            setDestinationIsland(preset.island);
+                            setShippingCost(preset.estimatedShippingFee);
+                            const firstDist = preset.districtList && preset.districtList.length > 0 ? preset.districtList[0] : '';
+                            setSelectedDistrict(firstDist);
+                            const newAddr = `${firstDist ? firstDist + ', ' : ''}${preset.cityRegency}, ${preset.province} (${preset.defaultHubLoket})`;
+                            setCustomerAddress(newAddr);
+                          }
+                        }}
+                        className="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 font-semibold text-xs text-blue-950 focus:border-blue-600 focus:outline-hidden"
+                      >
+                        <option value="">-- Pilih Kota / Kabupaten Spesifik --</option>
+                        {SPECIFIC_DESTINATION_PRESETS.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.island}] {p.cityRegency} ({p.province})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Kecamatan Sub-Dropdown */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                        2. Kecamatan / Wilayah Spesifik
+                      </label>
+                      <select
+                        value={selectedDistrict}
+                        onChange={(e) => {
+                          const dist = e.target.value;
+                          setSelectedDistrict(dist);
+                          const preset = SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === selectedPresetId);
+                          if (preset) {
+                            const newAddr = `${dist ? dist + ', ' : ''}${preset.cityRegency}, ${preset.province} (${preset.defaultHubLoket})`;
+                            setCustomerAddress(newAddr);
+                          }
+                        }}
+                        disabled={!selectedPresetId || !(SPECIFIC_DESTINATION_PRESETS.find(p => p.id === selectedPresetId)?.districtList?.length)}
+                        className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 font-medium text-xs focus:border-blue-600 focus:outline-hidden disabled:bg-zinc-100 disabled:text-zinc-400"
+                      >
+                        <option value="">-- Pilih Kecamatan / Area --</option>
+                        {SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === selectedPresetId)?.districtList?.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                        Wilayah / Pulau Utama
+                      </label>
+                      <select
+                        value={destinationIsland}
+                        onChange={(e) => {
+                          const isl = e.target.value as IslandRegion;
+                          setDestinationIsland(isl);
+                        }}
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-medium text-xs"
+                      >
+                        <option value="Aceh (Lokal Loket)">Aceh (Lokal Loket)</option>
+                        <option value="Sumatera">Sumatera</option>
+                        <option value="Jawa">Jawa</option>
+                        <option value="Kalimantan">Kalimantan</option>
+                        <option value="Sulawesi">Sulawesi</option>
+                        <option value="Bali & Nusa Tenggara">Bali & Nusa Tenggara</option>
+                        <option value="Maluku & Papua">Maluku & Papua</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                        Detail Alamat Lengkap & Loket / Terminal Tujuan
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        placeholder="Ketik detail jalan, RT/RW, nama kedai / loket..."
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs focus:border-blue-600 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Order Items Table */}
               <div className="border border-zinc-200 rounded-xl p-3 bg-zinc-50 space-y-2">
@@ -852,10 +1099,11 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                       <div className="col-span-2">
                         <input
                           type="number"
-                          min="1"
+                          min="0.01"
+                          step="any"
                           value={item.quantityKg}
                           onChange={(e) => updateItemRow(idx, 'quantityKg', e.target.value)}
-                          placeholder="kg"
+                          placeholder="kg (0.5)"
                           className="w-full rounded border border-zinc-200 p-1 text-[11px] font-mono"
                         />
                       </div>

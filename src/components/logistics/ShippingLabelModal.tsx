@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Shipment, Order } from '../../types/erp';
 import { formatIDR } from '../../services/dbService';
+import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
 
 interface ShippingLabelModalProps {
   shipment?: Shipment | null;
@@ -34,11 +35,11 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
   const [copied, setCopied] = useState(false);
 
   // Default Sender (Pengirim)
-  const [senderName, setSenderName] = useState('KOPIFLOW ROASTERY & WAREHOUSE');
-  const [senderContact, setSenderContact] = useState('Bang Malik (Gudang)');
-  const [senderPhone, setSenderPhone] = useState('0811-6890-2233');
+  const [senderName, setSenderName] = useState('KOFIARA HUB LHOKSEUMAWE');
+  const [senderContact, setSenderContact] = useState('Tgk. Mansur (Kepala Gudang)');
+  const [senderPhone, setSenderPhone] = useState('0812-6900-3344');
   const [senderAddress, setSenderAddress] = useState(
-    'Jl. Takengon - Isaq Km. 4, Kec. Bebesen, Kab. Aceh Tengah, Aceh (Kode Pos 24519)'
+    'Jl. Merdeka No. 88, Mon Geudong, Kota Lhokseumawe, Aceh (Kode Pos 24352)'
   );
 
   // Recipient (Penerima)
@@ -86,8 +87,22 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
       : 'Biji Kopi Sangrai & Biji Kopi Mentah Specialty'
   );
 
-  // Sync when prop updates
+  // Sync when prop updates & read warehouse head from local cache
   React.useEffect(() => {
+    // Load warehouse head staff from cache if available
+    try {
+      const whCached = localStorage.getItem('kopiflow_erp_warehouse_head');
+      if (whCached) {
+        const whList = JSON.parse(whCached);
+        if (whList && whList.length > 0) {
+          setSenderContact(`${whList[0].name} (Kepala Gudang)`);
+          setSenderPhone(whList[0].phone);
+        }
+      }
+    } catch {
+      // fallback
+    }
+
     if (shipment) {
       setRecipientName(shipment.customerName);
       setRecipientPhone(shipment.customerPhone);
@@ -110,6 +125,22 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
       setRecipientAddress(order.customerAddress);
       setTrackingNumber(`RESI-${order.invoiceNumber.replace('/', '-')}`);
       setWeightKg(order.totalWeightKg);
+      if (order.shippingMethod) {
+        setCourierName(order.shippingMethod);
+        if (order.shippingMethod.includes('GrabExpress')) {
+          setServiceType('Kurir Instan GrabExpress');
+          setLoketDestination('Pengantaran Langsung ke Alamat (GrabExpress)');
+          // Parse driver info if formatted as GrabExpress: Name (Plate - Phone)
+          setDriverInfo(order.shippingMethod);
+        } else if (order.shippingMethod.includes('Ambil di Gudang')) {
+          setServiceType('Pickup Direct / Ambil Sendiri');
+          setLoketDestination('Kofiara Hub Lhokseumawe (Pickup)');
+          setDriverInfo('Diambil Sendiri oleh Pelanggan');
+        } else {
+          setServiceType('Angkutan Antar Kota / Kargo Loket');
+          setLoketDestination(order.customerAddress);
+        }
+      }
       if (order.items && order.items.length > 0) {
         setContentsDesc(order.items.map((i) => `${i.beanName} (${i.quantityKg}kg)`).join(', '));
       }
@@ -203,6 +234,40 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
               <span>{copied ? 'Tersalin!' : 'Salin Teks Alamat (WA)'}</span>
             </button>
           </div>
+        </div>
+
+        {/* Region Destination Quick-Apply Toolbar - Hidden on Print */}
+        <div className="px-5 py-2.5 bg-amber-50/70 border-b border-amber-200/80 flex flex-wrap items-center gap-3 text-xs print:hidden">
+          <div className="flex items-center gap-1.5 font-bold text-amber-950">
+            <MapPin className="h-4 w-4 text-amber-700" />
+            <span>Preset Daerah Tujuan:</span>
+          </div>
+
+          <select
+            onChange={(e) => {
+              const preset = SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === e.target.value);
+              if (preset) {
+                const dist = preset.districtList?.[0] || '';
+                const fullAdd = `${dist ? dist + ', ' : ''}${preset.cityRegency}, Prov. ${preset.province}`;
+                setRecipientAddress(fullAdd);
+                setLoketDestination(preset.defaultHubLoket);
+              }
+            }}
+            defaultValue=""
+            className="rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs text-zinc-900 font-medium focus:border-amber-600 focus:outline-hidden"
+          >
+            <option value="" disabled>
+              -- Ubah Alamat Tujuan ke Daerah Spesifik --
+            </option>
+            {SPECIFIC_DESTINATION_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                [{p.province}] {p.cityRegency} ({p.districtList?.[0] || 'Umum'})
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-amber-800 italic">
+            (Pilih daerah di atas untuk mengisi alamat & loket tujuan secara otomatis)
+          </span>
         </div>
 
         {/* Printable Area */}

@@ -7,7 +7,9 @@ import {
   NotificationLog,
   Partner,
   InboundMovement,
-  OutboundMovement
+  OutboundMovement,
+  RoasterStaff,
+  WarehouseHead
 } from '../types/erp';
 
 // ACEH LOKET LOGISTICS PRESETS (Angkutan L300 & Bus Kargo Aceh)
@@ -285,3 +287,51 @@ export const NEUTRAL_EMPTY_NOTIFICATIONS: NotificationLog[] = [];
 export const NEUTRAL_EMPTY_PARTNERS: Partner[] = [...ACEH_LOKET_PRESETS];
 export const NEUTRAL_EMPTY_INBOUND: InboundMovement[] = [];
 export const NEUTRAL_EMPTY_OUTBOUND: OutboundMovement[] = [];
+
+// DATA PENGATURAN STAFF ROASTER & KEPALA GUDANG (KOFIARA HUB LHOKSEUMAWE)
+export const DEFAULT_ROASTER_STAFF: RoasterStaff[] = [
+  {
+    id: 'roaster-01',
+    name: 'Bang Malik (Head Roaster)',
+    phone: '0811-6890-2233',
+    role: 'Head Roaster',
+    certification: 'SCA Roaster Certified & Q Grader',
+    machineSpecialty: 'Mesin Roasting Rakitan Gayo 15kg & Probat 5kg',
+    shift: 'Pagi',
+    status: 'Active',
+    notes: 'Spesialis profil roasting Specialty & Light Roast Filter Gayo',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'roaster-02',
+    name: 'Fikri Roaster',
+    phone: '0852-9988-1122',
+    role: 'Senior Roaster',
+    certification: 'SCA Intermediate Roasting',
+    machineSpecialty: 'Mesin Roasting Rakitan Gayo 15kg',
+    shift: 'Siang',
+    status: 'Active',
+    notes: 'Penanggung jawab batch Commercial & Espresso Blend',
+    createdAt: new Date().toISOString()
+  }
+];
+
+export const DEFAULT_WAREHOUSE_HEAD: WarehouseHead[] = [
+  {
+    id: 'head-wh-01',
+    name: 'Tgk. Mansur',
+    phone: '0812-6900-3344',
+    nikStaff: 'KFH-LHK-2026-001',
+    hubLocation: 'Kofiara Hub Lhokseumawe',
+    shift: 'Full Time',
+    responsibilities: [
+      'QC Kadar Air & Berat Green Bean',
+      'Manajemen Silo & Rak Degassing',
+      'Dispatch Pengiriman Loket & GrabExpress',
+      'Stok Opname & Penandatanganan Surat Jalan'
+    ],
+    status: 'Primary',
+    notes: 'Kepala Gudang Utama Kofiara Hub Lhokseumawe',
+    createdAt: new Date().toISOString()
+  }
+];

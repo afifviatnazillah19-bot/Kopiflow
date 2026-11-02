@@ -24,6 +24,7 @@ import {
   CoffeeBean,
   Batch
 } from '../../types/erp';
+import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
 import {
   saveInboundMovement,
   saveOutboundMovement,
@@ -87,6 +88,10 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
   const [outShippingFee, setOutShippingFee] = useState<number>(45000);
   const [outDispatchedBy, setOutDispatchedBy] = useState('Hendra Setiawan');
   const [outNotes, setOutNotes] = useState('Titip di Loket Batoh Banda Aceh, penerima langsung ambil saat tiba.');
+  const [outPresetId, setOutPresetId] = useState<string>('aceh-banda-aceh');
+  const [outDistrict, setOutDistrict] = useState<string>('Kec. Lueng Bata (Terminal Batoh)');
+
+  const currentOutPreset = SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === outPresetId);
 
   // Filtered lists
   const filteredInbound = inbound.filter((item) => {
@@ -773,28 +778,100 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
                 </div>
               </div>
 
-              {/* Loket Aceh Section */}
+              {/* Loket Aceh & Regional Preset Section */}
               <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-3.5 space-y-3">
-                <div className="flex items-center gap-1.5 font-bold text-orange-950">
-                  <Truck className="h-4 w-4 text-orange-700" />
-                  <span>Pilihan Loket Angkutan Aceh (Lokal / Regional)</span>
+                <div className="flex items-center justify-between font-bold text-orange-950">
+                  <div className="flex items-center gap-1.5">
+                    <Truck className="h-4 w-4 text-orange-700" />
+                    <span>Pilihan Tujuan Spesifik & Loket Pengiriman</span>
+                  </div>
+                  <span className="text-[10px] bg-orange-200 text-orange-900 px-2 py-0.5 rounded font-medium">
+                    Daerah Spesifik
+                  </span>
+                </div>
+
+                {/* Specific Region Selectors */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-2.5 rounded-lg border border-orange-200">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
+                      1. Provinsi & Kota/Kabupaten Tujuan
+                    </label>
+                    <select
+                      value={outPresetId}
+                      onChange={(e) => {
+                        const presetId = e.target.value;
+                        setOutPresetId(presetId);
+                        const found = SPECIFIC_DESTINATION_PRESETS.find((p) => p.id === presetId);
+                        if (found) {
+                          const dist = found.districtList?.[0] || '';
+                          setOutDistrict(dist);
+                          setOutDestinationCity(`${found.cityRegency} - ${dist}`);
+                          setOutLoketName(found.defaultHubLoket);
+                          setOutShippingFee(found.estimatedShippingFee);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs focus:border-amber-500 focus:outline-hidden"
+                    >
+                      {SPECIFIC_DESTINATION_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          [{preset.province}] {preset.cityRegency} ({preset.island})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
+                      2. Kecamatan / Wilayah Spesifik
+                    </label>
+                    <select
+                      value={outDistrict}
+                      onChange={(e) => {
+                        const dist = e.target.value;
+                        setOutDistrict(dist);
+                        if (currentOutPreset) {
+                          setOutDestinationCity(`${currentOutPreset.cityRegency} - ${dist}`);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs focus:border-amber-500 focus:outline-hidden"
+                    >
+                      {currentOutPreset?.districtList?.map((d: string) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
-                      Pilih Loket / Bus Aceh
+                      Pilih Loket / Bus / Ekspedisi
                     </label>
                     <select
                       value={outLoketName}
                       onChange={(e) => setOutLoketName(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 focus:border-amber-500 focus:outline-hidden"
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-amber-500 focus:outline-hidden font-medium"
                     >
+                      <option value="GrabExpress / GoSend Instan Lhokseumawe">GrabExpress / GoSend Instan (Lhokseumawe)</option>
+                      <option value="Antar Sendiri (Kurir Roastery Kofiara)">Antar Sendiri (Kurir Roastery Kofiara Hub)</option>
+                      <option value="Ambil di Gudang (Pickup Direct Lhokseumawe)">Ambil di Gudang (Pickup Direct Lhokseumawe)</option>
                       {acehLokets.map((loket) => (
                         <option key={loket.id} value={loket.name}>
                           {loket.name} ({loket.city})
                         </option>
                       ))}
+                      {currentOutPreset?.defaultHubLoket && (
+                        <option value={currentOutPreset.defaultHubLoket}>
+                          Hub Preset: {currentOutPreset.defaultHubLoket}
+                        </option>
+                      )}
+                      <option value="JNT Express (Kargo / Reguler)">JNT Express (Kargo & Reguler)</option>
+                      <option value="JNE Express (YES / REG / JTR)">JNE Express (YES, REG, JTR)</option>
+                      <option value="Lion Parcel (Kargo Udara)">Lion Parcel (Kargo Udara)</option>
+                      <option value="Indah Logistic Cargo">Indah Logistic Cargo</option>
+                      <option value="Loket Simpati Star Kargo">Loket Simpati Star Kargo</option>
                       <option value="Loket Sinar L300 Gayo Express">Loket Sinar L300 Gayo Express</option>
                       <option value="Loket PMTOH Kargo Aceh">Loket PMTOH Kargo Aceh</option>
                     </select>
@@ -802,15 +879,15 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
 
                   <div>
                     <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">
-                      Loket Tujuan Pengambilan
+                      Rincian Loket Tujuan & Detail Daerah
                     </label>
                     <input
                       type="text"
                       required
                       value={outDestinationCity}
                       onChange={(e) => setOutDestinationCity(e.target.value)}
-                      placeholder="Loket Batoh Banda Aceh"
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 focus:border-amber-500 focus:outline-hidden"
+                      placeholder="Kab. Aceh Tengah - Kec. Bebesen"
+                      className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs focus:border-amber-500 focus:outline-hidden"
                     />
                   </div>
                 </div>

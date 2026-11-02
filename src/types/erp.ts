@@ -55,6 +55,17 @@ export interface CoffeeBean {
   createdAt: string;
 }
 
+export type WhatsAppProvider = 'direct' | 'openwa';
+
+export interface OpenWaConfig {
+  enabled: boolean;
+  provider: WhatsAppProvider;
+  serverUrl: string; // e.g. "http://localhost:8080"
+  apiKey?: string;
+  sessionId?: string; // e.g. "kopiflow"
+  autoFallbackToDirect: boolean;
+}
+
 export interface BusinessNotificationConfig {
   businessWhatsApp: string;
   businessEmail: string;
@@ -63,7 +74,16 @@ export interface BusinessNotificationConfig {
   defaultMinThresholdKg: number;
   notifyOnGreenLow: boolean;
   notifyOnRoastedLow: boolean;
+  openWa?: OpenWaConfig;
   updatedAt: string;
+}
+
+export interface BankAccountItem {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  isPrimary?: boolean;
 }
 
 export interface QrisPaymentConfig {
@@ -72,7 +92,48 @@ export interface QrisPaymentConfig {
   gopayNumber: string;
   accountHolder: string;
   paymentInstructions?: string;
+  alternativeBankAccounts?: BankAccountItem[];
   updatedAt: string;
+}
+
+export type ShippingMethodCategory =
+  | 'Loket Bus / L300'
+  | 'Grab / GoSend / Kurir Instan'
+  | 'Antar Sendiri (Kurir Roastery)'
+  | 'Ambil di Gudang (Pickup Direct)'
+  | 'Ekspedisi Kargo Antarpulau';
+
+export interface GrabDriverData {
+  driverName: string;
+  vehiclePlate: string;
+  driverPhone: string;
+  orderPinOrRef?: string;
+}
+
+export interface RoasterStaff {
+  id: string;
+  name: string;
+  phone: string;
+  role: 'Head Roaster' | 'Senior Roaster' | 'Roaster Operator' | 'Cupping Master';
+  certification?: string;
+  machineSpecialty?: string;
+  shift: 'Pagi' | 'Siang' | 'Malam' | 'Flexi';
+  status: 'Active' | 'On Leave' | 'Inactive';
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface WarehouseHead {
+  id: string;
+  name: string;
+  phone: string;
+  nikStaff: string;
+  hubLocation: string;
+  shift: 'Pagi' | 'Siang' | 'Malam' | 'Full Time';
+  responsibilities: string[];
+  status: 'Active' | 'Primary';
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface Batch {

@@ -154,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ACEH & INDO
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">Warehouse & Roast Lab</p>
+              <p className="text-xs text-amber-400 font-semibold">Kofiara Hub Lhokseumawe</p>
             </div>
           </div>
         </div>

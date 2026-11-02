@@ -13,9 +13,17 @@ import {
   ExternalLink,
   Filter,
   Sparkles,
-  Settings,
   SlidersHorizontal,
-  RefreshCw
+  RefreshCw,
+  Server,
+  Radio,
+  HelpCircle,
+  CheckCircle,
+  XCircle,
+  Terminal,
+  Zap,
+  ShieldCheck,
+  Cpu
 } from 'lucide-react';
 import {
   NotificationLog,
@@ -25,7 +33,9 @@ import {
   Order,
   Shipment,
   RoastLog,
-  BusinessNotificationConfig
+  BusinessNotificationConfig,
+  OpenWaConfig,
+  WhatsAppProvider
 } from '../../types/erp';
 import {
   formatIDR,
@@ -35,8 +45,11 @@ import {
   subscribeToNotificationConfig,
   saveNotificationConfig,
   DEFAULT_NOTIFICATION_CONFIG,
+  DEFAULT_OPENWA_CONFIG,
   buildLowStockAlertMessage,
-  buildSingleBeanLowStockMessage
+  buildSingleBeanLowStockMessage,
+  testOpenWaConnection,
+  dispatchWhatsAppNotification
 } from '../../services/dbService';
 
 interface NotificationCenterProps {
@@ -89,6 +102,53 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [selectedLowBeanId, setSelectedLowBeanId] = useState<string>('all');
   const [customNote, setCustomNote] = useState<string>('');
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // OpenWA (@open-wa/wa-automate) States
+  const [isTestingOpenWa, setIsTestingOpenWa] = useState(false);
+  const [openWaTestResult, setOpenWaTestResult] = useState<{
+    tested: boolean;
+    ok: boolean;
+    statusText: string;
+  } | null>(null);
+  const [showOpenWaGuideModal, setShowOpenWaGuideModal] = useState(false);
+  const [isSendingWA, setIsSendingWA] = useState(false);
+  const [settingsSubTab, setSettingsSubTab] = useState<'contact' | 'openwa'>('contact');
+  const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSnippet(label);
+    setTimeout(() => setCopiedSnippet(null), 2500);
+  };
+
+  const handleTestOpenWa = async () => {
+    setIsTestingOpenWa(true);
+    setOpenWaTestResult(null);
+    try {
+      const res = await testOpenWaConnection(
+        tempConfig.openWa?.serverUrl || 'http://localhost:8080',
+        tempConfig.openWa?.apiKey
+      );
+      setOpenWaTestResult({
+        tested: true,
+        ok: res.ok,
+        statusText: res.statusText
+      });
+      if (res.ok) {
+        showToast('🟢 Server OpenWA terhubung & siap digunakan!');
+      } else {
+        showToast(`🔴 ${res.statusText}`);
+      }
+    } catch (err: any) {
+      setOpenWaTestResult({
+        tested: true,
+        ok: false,
+        statusText: err?.message || 'Gagal tersambung ke server OpenWA'
+      });
+    } finally {
+      setIsTestingOpenWa(false);
+    }
+  };
 
   // Sync recipient when template changes
   useEffect(() => {
@@ -217,25 +277,40 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const { subject, body } = generateMessageText();
 
-  // Handle WhatsApp launch
+  // Handle WhatsApp launch (OpenWA REST API or wa.me direct fallback)
   const handleLaunchWhatsApp = async () => {
-    const url = buildWhatsAppLink(recipient, body);
+    setIsSendingWA(true);
+    try {
+      const res = await dispatchWhatsAppNotification(recipient, body, notifConfig);
 
-    // Save log to Firestore
-    await saveNotificationLog({
-      id: `notif-${Date.now().toString(36)}`,
-      channel: 'WhatsApp',
-      recipient: recipient,
-      subject,
-      messagePreview: body.slice(0, 200) + '...',
-      type: selectedTemplate,
-      status: 'Sent',
-      sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      createdAt: new Date().toISOString()
-    });
+      // Save log to Firestore
+      await saveNotificationLog({
+        id: `notif-${Date.now().toString(36)}`,
+        channel: 'WhatsApp',
+        recipient: recipient,
+        subject,
+        messagePreview: body.slice(0, 200) + '...',
+        type: selectedTemplate,
+        status: res.success ? 'Sent' : 'Failed',
+        sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
 
-    onRefresh();
-    window.open(url, '_blank');
+      onRefresh();
+
+      if (res.channel === 'openwa' && res.success) {
+        showToast(res.message);
+      } else if (res.url) {
+        showToast(res.message);
+        window.open(res.url, '_blank');
+      } else {
+        showToast(`⚠️ ${res.error || res.message}`);
+      }
+    } catch (err: any) {
+      showToast(`Error kirim WhatsApp: ${err?.message || 'Gagal'}`);
+    } finally {
+      setIsSendingWA(false);
+    }
   };
 
   // Handle Copy message
@@ -273,24 +348,42 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   );
 
   const handleQuickSendAllWA = async () => {
-    const { subject, body } = buildLowStockAlertMessage(beans, notifConfig);
-    const url = buildWhatsAppLink(notifConfig.businessWhatsApp, body);
+    setIsSendingWA(true);
+    try {
+      const { subject, body } = buildLowStockAlertMessage(beans, notifConfig);
+      const res = await dispatchWhatsAppNotification(
+        notifConfig.businessWhatsApp,
+        body,
+        notifConfig
+      );
 
-    await saveNotificationLog({
-      id: `notif-wa-bulk-${Date.now().toString(36)}`,
-      channel: 'WhatsApp',
-      recipient: notifConfig.businessWhatsApp,
-      subject,
-      messagePreview: body.slice(0, 200) + '...',
-      type: 'Stock Alert',
-      status: 'Sent',
-      sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      createdAt: new Date().toISOString()
-    });
+      await saveNotificationLog({
+        id: `notif-wa-bulk-${Date.now().toString(36)}`,
+        channel: 'WhatsApp',
+        recipient: notifConfig.businessWhatsApp,
+        subject,
+        messagePreview: body.slice(0, 200) + '...',
+        type: 'Stock Alert',
+        status: res.success ? 'Sent' : 'Failed',
+        sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
 
-    onRefresh();
-    showToast(`Peringatan WhatsApp stok menipis dikirim ke ${notifConfig.businessWhatsApp}`);
-    window.open(url, '_blank');
+      onRefresh();
+
+      if (res.channel === 'openwa' && res.success) {
+        showToast(res.message);
+      } else if (res.url) {
+        showToast(res.message);
+        window.open(res.url, '_blank');
+      } else {
+        showToast(`⚠️ ${res.error || res.message}`);
+      }
+    } catch (err: any) {
+      showToast(`Error kirim WhatsApp: ${err?.message || 'Gagal'}`);
+    } finally {
+      setIsSendingWA(false);
+    }
   };
 
   const handleQuickSendAllEmail = async () => {
@@ -354,11 +447,28 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-800">
-              WhatsApp Direct API & Mail Service Siap
-            </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa' ? (
+              <div className="flex items-center gap-1.5 rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-bold text-emerald-800">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Zap className="h-3.5 w-3.5 text-emerald-600" />
+                <span>OpenWA Gateway Aktif ({notifConfig.openWa.serverUrl})</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-full bg-zinc-100 border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-700">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Mode WhatsApp Direct (wa.me)</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowOpenWaGuideModal(true)}
+              className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors shadow-2xs"
+            >
+              <HelpCircle className="h-3.5 w-3.5 text-amber-600" />
+              <span>Panduan OpenWA</span>
+            </button>
           </div>
         </div>
       </div>
@@ -397,15 +507,27 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleQuickSendAllWA}
-              disabled={lowStockBeans.length === 0}
+              disabled={lowStockBeans.length === 0 || isSendingWA}
               className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-xs ${
                 lowStockBeans.length > 0
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50'
                   : 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
               }`}
             >
-              <MessageCircle className="h-4 w-4" />
-              <span>Kirim Peringatan WA ({notifConfig.businessWhatsApp})</span>
+              {isSendingWA ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa' ? (
+                <Zap className="h-4 w-4 text-amber-200" />
+              ) : (
+                <MessageCircle className="h-4 w-4" />
+              )}
+              <span>
+                {isSendingWA
+                  ? 'Mengirim...'
+                  : notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa'
+                  ? `Kirim via OpenWA (${notifConfig.businessWhatsApp})`
+                  : `Kirim via WhatsApp (${notifConfig.businessWhatsApp})`}
+              </span>
             </button>
 
             <button
@@ -425,8 +547,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               onClick={() => setIsEditingConfig(!isEditingConfig)}
               className="flex items-center gap-1 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 shadow-2xs"
             >
-              <Settings className="h-3.5 w-3.5 text-zinc-500" />
-              <span>{isEditingConfig ? 'Tutup Pengaturan' : 'Atur Kontak Bisnis'}</span>
+              <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-500" />
+              <span>{isEditingConfig ? 'Tutup Pengaturan' : 'Atur Kontak & OpenWA'}</span>
             </button>
           </div>
         </div>
@@ -455,88 +577,366 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 border border-zinc-200">
-            <span className="text-zinc-400 font-medium">Batas Minimal Default:</span>
+            <span className="text-zinc-400 font-medium">Batas Minimal:</span>
             <span className="font-mono font-bold text-amber-800">
               {notifConfig.defaultMinThresholdKg} kg
             </span>
           </div>
+
+          <div className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 border border-zinc-200">
+            <span className="text-zinc-400 font-medium">Engine WhatsApp:</span>
+            {notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa' ? (
+              <span className="font-bold text-emerald-700 flex items-center gap-1">
+                <Server className="h-3.5 w-3.5 text-emerald-600" />
+                <span>OpenWA REST Gateway</span>
+              </span>
+            ) : (
+              <span className="font-semibold text-zinc-700 flex items-center gap-1">
+                <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Direct Link (wa.me)</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Expandable Settings Form */}
+        {/* Expandable Settings Form with Sub-Tabs */}
         {isEditingConfig && (
           <form
             onSubmit={handleSaveConfig}
-            className="rounded-xl border border-amber-200 bg-white p-4 space-y-3 text-xs animate-in fade-in duration-150"
+            className="rounded-xl border border-amber-200 bg-white p-4 space-y-4 text-xs animate-in fade-in duration-150"
           >
-            <div className="font-bold text-sm text-zinc-900 flex items-center gap-1.5">
-              <SlidersHorizontal className="h-4 w-4 text-amber-700" />
-              <span>Ubah Parameter Notifikasi Otomatis Bisnis</span>
+            {/* Sub-tab selection */}
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('contact')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    settingsSubTab === 'contact'
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <span>Kontak & Batas Minimal Stok</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('openwa')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    settingsSubTab === 'openwa'
+                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                      : 'text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  <Server className="h-3.5 w-3.5" />
+                  <span>OpenWA WhatsApp API Gateway</span>
+                  {tempConfig.openWa?.enabled && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  )}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowOpenWaGuideModal(true)}
+                className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
+              >
+                <HelpCircle className="h-3.5 w-3.5" />
+                <span>Panduan Setup OpenWA</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Nomor WhatsApp Bisnis
-                </label>
-                <input
-                  type="text"
-                  value={tempConfig.businessWhatsApp}
-                  onChange={(e) =>
-                    setTempConfig({ ...tempConfig, businessWhatsApp: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-amber-600 focus:outline-hidden"
-                  placeholder="081269008899"
-                />
-              </div>
+            {/* TAB 1: KONTAK & AMBANG BATAS */}
+            {settingsSubTab === 'contact' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-100">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Nomor WhatsApp Bisnis
+                  </label>
+                  <input
+                    type="text"
+                    value={tempConfig.businessWhatsApp}
+                    onChange={(e) =>
+                      setTempConfig({ ...tempConfig, businessWhatsApp: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-amber-600 focus:outline-hidden"
+                    placeholder="081269008899"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Email Bisnis Resmi
-                </label>
-                <input
-                  type="email"
-                  value={tempConfig.businessEmail}
-                  onChange={(e) =>
-                    setTempConfig({ ...tempConfig, businessEmail: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-blue-600 focus:outline-hidden"
-                  placeholder="afifviatnazillah19@gmail.com"
-                />
-              </div>
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Email Bisnis Resmi
+                  </label>
+                  <input
+                    type="email"
+                    value={tempConfig.businessEmail}
+                    onChange={(e) =>
+                      setTempConfig({ ...tempConfig, businessEmail: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-blue-600 focus:outline-hidden"
+                    placeholder="afifviatnazillah19@gmail.com"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Nama Penerima / Jabatan
-                </label>
-                <input
-                  type="text"
-                  value={tempConfig.managerName}
-                  onChange={(e) =>
-                    setTempConfig({ ...tempConfig, managerName: e.target.value })
-                  }
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-600 focus:outline-hidden"
-                  placeholder="Kepala Gudang KopiFlow"
-                />
-              </div>
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Nama Penerima / Jabatan
+                  </label>
+                  <input
+                    type="text"
+                    value={tempConfig.managerName}
+                    onChange={(e) =>
+                      setTempConfig({ ...tempConfig, managerName: e.target.value })
+                    }
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-600 focus:outline-hidden"
+                    placeholder="Kepala Gudang KopiFlow"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Batas Minimal Stok Standar (kg)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={tempConfig.defaultMinThresholdKg}
-                  onChange={(e) =>
-                    setTempConfig({
-                      ...tempConfig,
-                      defaultMinThresholdKg: Number(e.target.value)
-                    })
-                  }
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-amber-600 focus:outline-hidden"
-                />
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Batas Minimal Stok Standar (kg)
+                  </label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    value={tempConfig.defaultMinThresholdKg}
+                    onChange={(e) =>
+                      setTempConfig({
+                        ...tempConfig,
+                        defaultMinThresholdKg: Number(e.target.value)
+                      })
+                    }
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono focus:border-amber-600 focus:outline-hidden"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* TAB 2: OPENWA API CONFIGURATION */}
+            {settingsSubTab === 'openwa' && (
+              <div className="space-y-4 animate-in fade-in duration-100">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5">
+                  <div className="font-bold text-xs text-emerald-950 flex items-center gap-1.5 mb-1">
+                    <Cpu className="h-4 w-4 text-emerald-700" />
+                    <span>Mode Pengiriman Pesan WhatsApp</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed mb-3">
+                    Pilih antara mode tautan langsung (wa.me) atau server otomasi OpenWA (@open-wa/wa-automate)
+                    yang mengirim pesan di latar belakang tanpa membuka tab browser.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        tempConfig.openWa?.provider === 'direct'
+                          ? 'border-emerald-600 bg-white shadow-xs'
+                          : 'border-zinc-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="waProvider"
+                        value="direct"
+                        checked={tempConfig.openWa?.provider === 'direct' || !tempConfig.openWa?.enabled}
+                        onChange={() =>
+                          setTempConfig({
+                            ...tempConfig,
+                            openWa: {
+                              ...(tempConfig.openWa || DEFAULT_OPENWA_CONFIG),
+                              enabled: false,
+                              provider: 'direct'
+                            }
+                          })
+                        }
+                        className="mt-0.5 text-emerald-600"
+                      />
+                      <div>
+                        <div className="font-bold text-zinc-900 text-xs">
+                          Mode 1: WhatsApp Direct Link (wa.me)
+                        </div>
+                        <div className="text-[11px] text-zinc-500 mt-0.5">
+                          Gratis, tanpa instalasi server. Mengarahkan ke WhatsApp Web/App di browser.
+                        </div>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        tempConfig.openWa?.provider === 'openwa' && tempConfig.openWa?.enabled
+                          ? 'border-emerald-600 bg-white shadow-xs ring-1 ring-emerald-500'
+                          : 'border-zinc-200 bg-white/70 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="waProvider"
+                        value="openwa"
+                        checked={tempConfig.openWa?.provider === 'openwa' && tempConfig.openWa?.enabled}
+                        onChange={() =>
+                          setTempConfig({
+                            ...tempConfig,
+                            openWa: {
+                              ...(tempConfig.openWa || DEFAULT_OPENWA_CONFIG),
+                              enabled: true,
+                              provider: 'openwa'
+                            }
+                          })
+                        }
+                        className="mt-0.5 text-emerald-600"
+                      />
+                      <div>
+                        <div className="font-bold text-emerald-900 text-xs flex items-center gap-1.5">
+                          <span>Mode 2: OpenWA REST API Gateway</span>
+                          <span className="rounded bg-emerald-600 px-1.5 py-0.2 text-[9px] font-bold text-white uppercase">
+                            Auto-Send
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-zinc-500 mt-0.5">
+                          Kirim otomatis di latar belakang via HTTP POST ke daemon OpenWA tanpa buka tab.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* OpenWA Server Inputs */}
+                {tempConfig.openWa?.provider === 'openwa' && (
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3.5 space-y-3">
+                    <div className="font-bold text-zinc-900 text-xs flex items-center gap-1.5">
+                      <Server className="h-4 w-4 text-zinc-700" />
+                      <span>Parameter Server OpenWA</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block font-semibold text-zinc-700 mb-1">
+                          URL Server OpenWA REST API
+                        </label>
+                        <input
+                          type="text"
+                          value={tempConfig.openWa?.serverUrl || 'http://localhost:8080'}
+                          onChange={(e) =>
+                            setTempConfig({
+                              ...tempConfig,
+                              openWa: {
+                                ...(tempConfig.openWa || DEFAULT_OPENWA_CONFIG),
+                                serverUrl: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-mono focus:border-emerald-600 focus:outline-hidden"
+                          placeholder="http://localhost:8080"
+                        />
+                        <p className="text-[10px] text-zinc-500 mt-1">
+                          Port standar OpenWA REST: 8080 (contoh: http://localhost:8080 atau IP VPS Anda)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-zinc-700 mb-1">
+                          Session ID
+                        </label>
+                        <input
+                          type="text"
+                          value={tempConfig.openWa?.sessionId || 'kopiflow'}
+                          onChange={(e) =>
+                            setTempConfig({
+                              ...tempConfig,
+                              openWa: {
+                                ...(tempConfig.openWa || DEFAULT_OPENWA_CONFIG),
+                                sessionId: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-mono focus:border-emerald-600 focus:outline-hidden"
+                          placeholder="kopiflow"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="block font-semibold text-zinc-700 mb-1">
+                          API Key / Bearer Secret (Opsional)
+                        </label>
+                        <input
+                          type="password"
+                          value={tempConfig.openWa?.apiKey || ''}
+                          onChange={(e) =>
+                            setTempConfig({
+                              ...tempConfig,
+                              openWa: {
+                                ...(tempConfig.openWa || DEFAULT_OPENWA_CONFIG),
+                                apiKey: e.target.value
+                              }
+                            })
+                          }
+                          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 font-mono focus:border-emerald-600 focus:outline-hidden"
+                          placeholder="Kosongkan jika server OpenWA dijalankan tanpa password"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-200">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={tempConfig.openWa?.autoFallbackToDirect ?? true}
+                          onChange={(e) =>
+                            setTempConfig({
+                              ...tempConfig,
+                              openWa: {
+                                ...(tempConfig.openWa || DEFAULT_OPENWA_CONFIG),
+                                autoFallbackToDirect: e.target.checked
+                              }
+                            })
+                          }
+                          className="rounded text-emerald-600"
+                        />
+                        <span className="text-zinc-700 font-medium text-[11px]">
+                          Auto-fallback ke WhatsApp Direct (wa.me) jika server OpenWA mati/offline
+                        </span>
+                      </label>
+
+                      {/* Ping Test Button */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTestOpenWa}
+                          disabled={isTestingOpenWa}
+                          className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 ${isTestingOpenWa ? 'animate-spin' : ''}`}
+                          />
+                          <span>{isTestingOpenWa ? 'Menguji Koneksi...' : 'Test Ping Server'}</span>
+                        </button>
+
+                        {openWaTestResult && (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold ${
+                              openWaTestResult.ok
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-rose-100 text-rose-800 border border-rose-300'
+                            }`}
+                          >
+                            {openWaTestResult.ok ? (
+                              <CheckCircle className="h-3 w-3" />
+                            ) : (
+                              <XCircle className="h-3 w-3" />
+                            )}
+                            {openWaTestResult.statusText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
               <button
@@ -780,22 +1180,65 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
-            <button
-              onClick={handleLaunchWhatsApp}
-              className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2.5 px-4 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition-colors"
-            >
-              <MessageCircle className="h-4 w-4" />
-              <span>Buka WhatsApp Sekarang</span>
-            </button>
+          <div className="pt-2 space-y-2">
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                onClick={handleLaunchWhatsApp}
+                disabled={isSendingWA}
+                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2.5 px-4 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-60"
+              >
+                {isSendingWA ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa' ? (
+                  <Zap className="h-4 w-4 text-amber-200" />
+                ) : (
+                  <MessageCircle className="h-4 w-4" />
+                )}
+                <span>
+                  {isSendingWA
+                    ? 'Memproses Kirim...'
+                    : notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa'
+                    ? 'Kirim via OpenWA API (Background)'
+                    : 'Buka di WhatsApp (wa.me)'}
+                </span>
+              </button>
 
-            <button
-              onClick={handleSendEmail}
-              className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 py-2.5 px-4 text-xs font-bold text-white hover:bg-zinc-800 shadow-sm transition-colors"
-            >
-              <Mail className="h-4 w-4" />
-              <span>Kirim Email & Log</span>
-            </button>
+              <button
+                onClick={handleSendEmail}
+                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 py-2.5 px-4 text-xs font-bold text-white hover:bg-zinc-800 shadow-sm transition-colors"
+              >
+                <Mail className="h-4 w-4" />
+                <span>Kirim Email & Log</span>
+              </button>
+            </div>
+
+            {/* Provider indicator */}
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 border-t border-zinc-100">
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium">Engine Aktif:</span>
+                {notifConfig.openWa?.enabled && notifConfig.openWa?.provider === 'openwa' ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    OpenWA REST ({notifConfig.openWa.serverUrl})
+                  </span>
+                ) : (
+                  <span className="text-zinc-600 flex items-center gap-1">
+                    <MessageCircle className="h-3 w-3 text-emerald-600" />
+                    Direct Link (wa.me)
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingConfig(true);
+                  setSettingsSubTab('openwa');
+                }}
+                className="text-emerald-700 hover:text-emerald-800 font-semibold underline underline-offset-2"
+              >
+                Konfigurasi OpenWA
+              </button>
+            </div>
           </div>
         </div>
 
@@ -872,6 +1315,231 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           </div>
         </div>
       </div>
+
+      {/* MODAL: PANDUAN LENGKAP OPENWA (@open-wa/wa-automate) */}
+      {showOpenWaGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-zinc-200 overflow-hidden my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-zinc-200 bg-gradient-to-r from-emerald-700 to-teal-800 px-6 py-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-white/20 p-2">
+                  <Server className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">Panduan Integrasi OpenWA API WhatsApp</h3>
+                  <p className="text-xs text-emerald-100">
+                    Kirim pesan otomatis di latar belakang tanpa membuka tab browser (Headless REST API)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOpenWaGuideModal(false)}
+                className="rounded-lg p-1 text-white/80 hover:bg-white/10 hover:text-white"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs text-zinc-700">
+              {/* Penjelasan Konsep */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2">
+                <div className="font-bold text-sm text-emerald-950 flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-emerald-600" />
+                  <span>Bagaimana Cara Kerja OpenWA di KopiFlow ERP?</span>
+                </div>
+                <p className="leading-relaxed text-zinc-700">
+                  Secara default, tombol WhatsApp di web menggunakan <strong>Direct Link (wa.me)</strong> yang membuka
+                  aplikasi WhatsApp dan mengharuskan Anda mengklik tombol "Kirim" secara manual.
+                </p>
+                <p className="leading-relaxed text-zinc-700">
+                  Dengan <strong>OpenWA (@open-wa/wa-automate)</strong>, Anda menjalankan server kecil di komputer/VPS.
+                  Aplikasi KopiFlow akan langsung mengirimkan perintah HTTP POST (<code>/sendText</code>) ke server OpenWA,
+                  sehingga pesan peringatan stok menipis, faktur, atau resi <strong>langsung terkirim secara otomatis di latar belakang</strong> tanpa popup!
+                </p>
+              </div>
+
+              {/* Langkah-langkah Setup */}
+              <div className="space-y-4">
+                <div className="font-extrabold text-sm text-zinc-900 border-b border-zinc-200 pb-1.5">
+                  3 Langkah Menjalankan OpenWA:
+                </div>
+
+                {/* Step 1 */}
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-zinc-900 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px] font-extrabold">
+                        1
+                      </span>
+                      Jalankan Server OpenWA (Pilih Docker atau Node.js)
+                    </span>
+                  </div>
+
+                  {/* Opsi A: Docker */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-600 text-[11px]">
+                        Opsi A: Menggunakan Docker (Direkomendasikan)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(
+                            'docker run -d --name openwa -p 8080:8080 openwa/wa-automate',
+                            'docker'
+                          )
+                        }
+                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>{copiedSnippet === 'docker' ? 'Tersalin!' : 'Salin Perintah'}</span>
+                      </button>
+                    </div>
+                    <pre className="rounded-lg bg-zinc-900 p-2.5 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+                      docker run -d --name openwa -p 8080:8080 openwa/wa-automate
+                    </pre>
+                  </div>
+
+                  {/* Opsi B: NPX */}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-600 text-[11px]">
+                        Opsi B: Menggunakan Node.js / NPX Langsung di Terminal
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(
+                            'npx @open-wa/wa-automate-cli --port=8080 --session-id=kopiflow',
+                            'npx'
+                          )
+                        }
+                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>{copiedSnippet === 'npx' ? 'Tersalin!' : 'Salin Perintah'}</span>
+                      </button>
+                    </div>
+                    <pre className="rounded-lg bg-zinc-900 p-2.5 font-mono text-[11px] text-amber-300 overflow-x-auto">
+                      npx @open-wa/wa-automate-cli --port=8080 --session-id=kopiflow
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-2">
+                  <div className="font-bold text-amber-950 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white text-[11px] font-extrabold">
+                      2
+                    </span>
+                    <span>Di Mana Lokasi Scan QR Code-nya?</span>
+                  </div>
+                  <ul className="space-y-1.5 text-zinc-700 leading-relaxed pl-7 list-disc">
+                    <li>
+                      <strong>Di Terminal / Konsol:</strong> QR Code gambar dari karakter ASCII akan tercetak langsung di dalam jendela Terminal tempat Anda menjalankan perintah di atas.
+                    </li>
+                    <li>
+                      <strong>Di Browser Web:</strong> Buka tab baru di browser dan akses{' '}
+                      <code className="bg-white border border-amber-300 px-1.5 py-0.5 rounded text-amber-900 font-mono font-bold">
+                        http://localhost:8080
+                      </code>{' '}
+                      (atau port yang Anda pilih). QR Code akan tampil di layar.
+                    </li>
+                    <li>
+                      Buka aplikasi WhatsApp di HP &rarr; masuk ke <strong>Perangkat Tertaut (Linked Devices)</strong> &rarr; scan QR Code tersebut. Cukup 1x scan saja!
+                    </li>
+                  </ul>
+                </div>
+
+                {/* FAQ / Port Custom */}
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-2">
+                  <div className="font-bold text-zinc-900 flex items-center gap-2">
+                    <Server className="h-4 w-4 text-emerald-700" />
+                    <span>Bagaimana Jika Port 8080 Bentrok atau Tidak Bisa Digunakan?</span>
+                  </div>
+                  <p className="leading-relaxed text-zinc-600">
+                    Anda bebas menggunakan port berapa saja (misalnya <strong>8081, 3000, 5000, 8888, dll</strong>). Cukup ganti angka port di terminal dan sesuaikan URL di KopiFlow ERP.
+                  </p>
+
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-700 text-[11px]">
+                        Contoh Perintah Menggunakan Port 8081:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(
+                            'npx @open-wa/wa-automate-cli --port=8081 --session-id=kopiflow',
+                            'port8081'
+                          )
+                        }
+                        className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>{copiedSnippet === 'port8081' ? 'Tersalin!' : 'Salin Port 8081'}</span>
+                      </button>
+                    </div>
+                    <pre className="rounded-lg bg-zinc-900 p-2 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+                      npx @open-wa/wa-automate-cli --port=8081 --session-id=kopiflow
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-1.5">
+                  <div className="font-bold text-zinc-900 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px] font-extrabold">
+                      3
+                    </span>
+                    Aktifkan & Hubungkan di KopiFlow ERP
+                  </div>
+                  <p className="leading-relaxed text-zinc-600">
+                    Di KopiFlow ERP, buka <strong>Atur Kontak & OpenWA</strong> &rarr; pilih tab <strong>OpenWA WhatsApp API Gateway</strong> &rarr;
+                    masukkan URL server (<code className="font-mono bg-zinc-200 px-1 rounded">http://localhost:8080</code> atau <code className="font-mono bg-zinc-200 px-1 rounded">http://localhost:8081</code>) &rarr;
+                    tekan <strong>Test Ping Server</strong> hingga muncul tanda 🟢 Online &rarr; lalu tekan <strong>Simpan Konfigurasi</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Fitur Keamanan Auto-Fallback */}
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 flex items-start gap-3">
+                <ShieldCheck className="h-5 w-5 text-blue-700 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-xs text-blue-950">Fitur Keamanan Auto-Fallback Aktif</div>
+                  <p className="text-[11px] text-blue-800 mt-0.5 leading-relaxed">
+                    Jika server OpenWA Anda sedang offline, mati listrik, atau tidak merespons, sistem KopiFlow
+                    secara cerdas akan langsung mengalihkan pengiriman ke WhatsApp Direct (wa.me) sehingga
+                    peringatan stok gudang dan pesan pelanggan tidak akan pernah terlewat.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50 px-6 py-3.5">
+              <span className="text-[11px] text-zinc-500">
+                Pustaka resmi: <code className="font-mono text-zinc-700">@open-wa/wa-automate</code>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOpenWaGuideModal(false);
+                  setIsEditingConfig(true);
+                  setSettingsSubTab('openwa');
+                }}
+                className="rounded-xl bg-emerald-700 px-4 py-2 font-bold text-white shadow-xs hover:bg-emerald-800 transition-colors"
+              >
+                Buka Pengaturan OpenWA Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

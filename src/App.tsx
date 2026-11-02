@@ -245,7 +245,7 @@ export default function App() {
             )}
 
             {currentTab === 'orders' && (
-              <OrderManager orders={orders} beans={beans} onRefresh={handleManualRefresh} />
+              <OrderManager orders={orders} beans={beans} partners={partners} onRefresh={handleManualRefresh} />
             )}
 
             {currentTab === 'roastlab' && (

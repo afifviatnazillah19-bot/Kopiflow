@@ -16,7 +16,14 @@ import {
   Copy,
   Check,
   ShieldAlert,
-  Server
+  Server,
+  Plus,
+  UserCheck,
+  Building2,
+  ShieldCheck,
+  Edit2,
+  BadgeCheck,
+  User
 } from 'lucide-react';
 import {
   CoffeeBean,
@@ -27,14 +34,19 @@ import {
   NotificationLog,
   Partner,
   InboundMovement,
-  OutboundMovement
+  OutboundMovement,
+  RoasterStaff,
+  WarehouseHead
 } from '../../types/erp';
 import {
   clearAllCollections,
   clearCollection,
   seedNeutralTestData,
-  COLLECTIONS
+  COLLECTIONS,
+  getLocalCache,
+  setLocalCache
 } from '../../services/dbService';
+import { DEFAULT_ROASTER_STAFF, DEFAULT_WAREHOUSE_HEAD } from '../../data/initialData';
 
 interface DataSettingsManagerProps {
   beans: CoffeeBean[];
@@ -59,6 +71,125 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
   inbound,
   outbound
 }) => {
+  const [activeSettingTab, setActiveSettingTab] = useState<'staff' | 'database'>('staff');
+
+  // Staff States (Roasters & Kepala Gudang)
+  const [roasters, setRoasters] = useState<RoasterStaff[]>(() =>
+    getLocalCache('roaster_staff', DEFAULT_ROASTER_STAFF)
+  );
+  const [warehouseHeadList, setWarehouseHeadList] = useState<WarehouseHead[]>(() =>
+    getLocalCache('warehouse_head', DEFAULT_WAREHOUSE_HEAD)
+  );
+
+  // Roaster Modal
+  const [isRoasterModalOpen, setIsRoasterModalOpen] = useState(false);
+  const [editingRoaster, setEditingRoaster] = useState<RoasterStaff | null>(null);
+  const [rName, setRName] = useState('');
+  const [rPhone, setRPhone] = useState('');
+  const [rRole, setRRole] = useState<RoasterStaff['role']>('Head Roaster');
+  const [rCert, setRCert] = useState('SCA Roaster Certified');
+  const [rMachine, setRMachine] = useState('Mesin Roasting Rakitan Gayo 15kg');
+  const [rShift, setRShift] = useState<RoasterStaff['shift']>('Pagi');
+  const [rStatus, setRStatus] = useState<RoasterStaff['status']>('Active');
+
+  // Warehouse Head Modal
+  const [isWhHeadModalOpen, setIsWhHeadModalOpen] = useState(false);
+  const [editingWhHead, setEditingWhHead] = useState<WarehouseHead | null>(null);
+  const [whName, setWhName] = useState('');
+  const [whPhone, setWhPhone] = useState('');
+  const [whNik, setWhNik] = useState('KFH-LHK-2026-001');
+  const [whHub, setWhHub] = useState('Kofiara Hub Lhokseumawe');
+  const [whShift, setWhShift] = useState<WarehouseHead['shift']>('Full Time');
+  const [whRespStr, setWhRespStr] = useState('QC Kadar Air, Dispatch Grab & Loket, Stok Opname');
+
+  const saveRoastersToCache = (data: RoasterStaff[]) => {
+    setRoasters(data);
+    setLocalCache('roaster_staff', data);
+  };
+
+  const saveWhHeadToCache = (data: WarehouseHead[]) => {
+    setWarehouseHeadList(data);
+    setLocalCache('warehouse_head', data);
+  };
+
+  const handleSaveRoaster = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingRoaster) {
+      const updated = roasters.map((item: RoasterStaff) =>
+        item.id === editingRoaster.id
+          ? {
+              ...item,
+              name: rName,
+              phone: rPhone,
+              role: rRole,
+              certification: rCert,
+              machineSpecialty: rMachine,
+              shift: rShift,
+              status: rStatus
+            }
+          : item
+      );
+      saveRoastersToCache(updated);
+      showNotification(`Data Roaster "${rName}" berhasil diperbarui.`);
+    } else {
+      const newRoaster: RoasterStaff = {
+        id: `rst-${Date.now()}`,
+        name: rName,
+        phone: rPhone,
+        role: rRole,
+        certification: rCert,
+        machineSpecialty: rMachine,
+        shift: rShift,
+        status: rStatus,
+        createdAt: new Date().toISOString()
+      };
+      saveRoastersToCache([...roasters, newRoaster]);
+      showNotification(`Roaster baru "${rName}" berhasil ditambahkan.`);
+    }
+    setIsRoasterModalOpen(false);
+  };
+
+  const handleSaveWhHead = (e: React.FormEvent) => {
+    e.preventDefault();
+    const respArr = whRespStr
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+
+    if (editingWhHead) {
+      const updated = warehouseHeadList.map((item: WarehouseHead) =>
+        item.id === editingWhHead.id
+          ? {
+              ...item,
+              name: whName,
+              phone: whPhone,
+              nikStaff: whNik,
+              hubLocation: whHub,
+              shift: whShift,
+              responsibilities: respArr
+            }
+          : item
+      );
+      saveWhHeadToCache(updated);
+      showNotification(`Data Kepala Gudang "${whName}" berhasil diperbarui.`);
+    } else {
+      const newHead: WarehouseHead = {
+        id: `whh-${Date.now()}`,
+        name: whName,
+        phone: whPhone,
+        nikStaff: whNik,
+        hubLocation: whHub,
+        shift: whShift,
+        responsibilities: respArr,
+        status: 'Primary',
+        createdAt: new Date().toISOString()
+      };
+      saveWhHeadToCache([...warehouseHeadList, newHead]);
+      showNotification(`Kepala Gudang baru "${whName}" berhasil ditambahkan.`);
+    }
+    setIsWhHeadModalOpen(false);
+  };
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [copiedRules, setCopiedRules] = useState(false);
@@ -242,43 +373,288 @@ service cloud.firestore {
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 border border-rose-200 text-rose-700 shrink-0">
-              <Database className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-zinc-900">Pengaturan & Manajemen Database</h2>
-                <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
-                  Data Wipe Control
-                </span>
+      {/* Setting Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-zinc-200 pb-2">
+        <button
+          onClick={() => setActiveSettingTab('staff')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+            activeSettingTab === 'staff'
+              ? 'bg-amber-800 text-white shadow-xs'
+              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+          }`}
+        >
+          <UserCheck className="h-4 w-4" />
+          <span>Pengaturan Data Roaster & Kepala Gudang</span>
+        </button>
+        <button
+          onClick={() => setActiveSettingTab('database')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+            activeSettingTab === 'database'
+              ? 'bg-zinc-900 text-white shadow-xs'
+              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+          }`}
+        >
+          <Database className="h-4 w-4" />
+          <span>Manajemen Database & Hapus Data</span>
+        </button>
+      </div>
+
+      {/* TAB 1: DATA ROASTER & KEPALA GUDANG (KOFIARA HUB LHOKSEUMAWE) */}
+      {activeSettingTab === 'staff' && (
+        <div className="space-y-6">
+          {/* SECTION 1: KEPALA GUDANG */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-100 text-amber-900 rounded-xl">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-zinc-900">
+                    Data Kepala Gudang & QC (Kofiara Hub Lhokseumawe)
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Penanggung jawab operasional penerimaan green bean, pengiriman loket/Grab, dan QC gudang
+                  </p>
+                </div>
               </div>
-              <p className="mt-1 text-xs text-zinc-500 max-w-2xl">
-                Kelola penghapusan data, reset database uji coba, dan sinkronisasi real-time. Anda
-                dapat menghapus data per kategori spesifik atau mengosongkan seluruh database
-                secara total.
-              </p>
+
+              <button
+                onClick={() => {
+                  const primary = warehouseHeadList[0];
+                  if (primary) {
+                    setEditingWhHead(primary);
+                    setWhName(primary.name);
+                    setWhPhone(primary.phone);
+                    setWhNik(primary.nikStaff);
+                    setWhHub(primary.hubLocation);
+                    setWhShift(primary.shift);
+                    setWhRespStr(primary.responsibilities.join(', '));
+                  } else {
+                    setEditingWhHead(null);
+                    setWhName('Tgk. Mansur');
+                    setWhPhone('0812-6900-3344');
+                    setWhNik('KFH-LHK-2026-001');
+                    setWhHub('Kofiara Hub Lhokseumawe');
+                    setWhShift('Full Time');
+                    setWhRespStr('QC Kadar Air, Dispatch Grab & Loket, Stok Opname');
+                  }
+                  setIsWhHeadModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-amber-800 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-900 transition-colors shadow-2xs shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                <span>+ Edit / Tambah Kepala Gudang</span>
+              </button>
+            </div>
+
+            {/* Warehouse Head Card Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {warehouseHeadList.map((wh: WarehouseHead) => (
+                <div
+                  key={wh.id}
+                  className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-sm text-zinc-950">{wh.name}</span>
+                        <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5">
+                          {wh.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-900 font-medium mt-0.5">
+                        NIK: <strong className="font-mono">{wh.nikStaff}</strong> • {wh.phone}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setEditingWhHead(wh);
+                        setWhName(wh.name);
+                        setWhPhone(wh.phone);
+                        setWhNik(wh.nikStaff);
+                        setWhHub(wh.hubLocation);
+                        setWhShift(wh.shift);
+                        setWhRespStr(wh.responsibilities.join(', '));
+                        setIsWhHeadModalOpen(true);
+                      }}
+                      className="text-amber-800 hover:text-amber-950 p-1 text-xs font-bold flex items-center gap-1"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+
+                  <div className="text-xs space-y-1 text-zinc-700 bg-white p-3 rounded-lg border border-amber-200/80">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-medium">Lokasi Hub Gudang:</span>
+                      <strong className="text-amber-950">{wh.hubLocation}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-medium">Shift Kerja:</span>
+                      <strong>{wh.shift}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">
+                      Tanggung Jawab Utama:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {wh.responsibilities.map((r: string, i: number) => (
+                        <span
+                          key={i}
+                          className="rounded bg-white border border-amber-300 px-2 py-0.5 text-[10px] font-semibold text-amber-900 shadow-2xs"
+                        >
+                          ✓ {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => {
-                setConfirmInput('');
-                setIsWipeModalOpen(true);
-              }}
-              disabled={isProcessing}
-              className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Kosongkan Seluruh Database</span>
-            </button>
+          {/* SECTION 2: ROASTER STAFF */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-orange-100 text-orange-900 rounded-xl">
+                  <Flame className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-zinc-900">
+                    Data Staff Roaster & Penyangrai Kopi
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Profil tim roaster, sertifikasi SCA, dan spesialisasi mesin sangrai rakitan / komersial
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingRoaster(null);
+                  setRName('');
+                  setRPhone('');
+                  setRRole('Senior Roaster');
+                  setRCert('SCA Roasting Certified');
+                  setRMachine('Mesin Roasting Rakitan Gayo 15kg');
+                  setRShift('Pagi');
+                  setRStatus('Active');
+                  setIsRoasterModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-orange-700 px-3.5 py-2 text-xs font-bold text-white hover:bg-orange-800 transition-colors shadow-2xs shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                <span>+ Tambah Roaster Baru</span>
+              </button>
+            </div>
+
+            {/* Roasters Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {roasters.map((r: RoasterStaff) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-orange-200 bg-orange-50/30 p-4 space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-sm text-zinc-950">{r.name}</span>
+                        <span className="rounded bg-orange-200 text-orange-900 text-[10px] font-bold px-2 py-0.5">
+                          {r.role}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-600 mt-0.5 font-medium">
+                        No. WA: <strong>{r.phone}</strong> • Shift: <strong>{r.shift}</strong>
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setEditingRoaster(r);
+                        setRName(r.name);
+                        setRPhone(r.phone);
+                        setRRole(r.role);
+                        setRCert(r.certification || '');
+                        setRMachine(r.machineSpecialty || '');
+                        setRShift(r.shift);
+                        setRStatus(r.status);
+                        setIsRoasterModalOpen(true);
+                      }}
+                      className="text-orange-800 hover:text-orange-950 p-1 text-xs font-bold flex items-center gap-1"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+
+                  <div className="text-xs space-y-1 bg-white p-3 rounded-lg border border-orange-200/80">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-medium">Sertifikasi & Lisensi:</span>
+                      <strong className="text-emerald-800">{r.certification || 'SCA Training'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500 font-medium">Spesialisasi Mesin:</span>
+                      <strong className="text-orange-950">{r.machineSpecialty || 'Mesin Rakitan 15kg'}</strong>
+                    </div>
+                  </div>
+
+                  {r.notes && (
+                    <p className="text-[11px] text-zinc-600 italic bg-white/60 p-2 rounded border border-orange-100">
+                      "{r.notes}"
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* TAB 2: MANAJEMEN DATABASE & RESET DATA */}
+      {activeSettingTab === 'database' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 border border-rose-200 text-rose-700 shrink-0">
+                  <Database className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-zinc-900">Pengaturan & Manajemen Database</h2>
+                    <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800">
+                      Data Wipe Control
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500 max-w-2xl">
+                    Kelola penghapusan data, reset database uji coba, dan sinkronisasi real-time. Anda
+                    dapat menghapus data per kategori spesifik atau mengosongkan seluruh database
+                    secara total.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => {
+                    setConfirmInput('');
+                    setIsWipeModalOpen(true);
+                  }}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Kosongkan Seluruh Database</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
       {/* Database Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -534,6 +910,251 @@ service cloud.firestore {
                 <span>{isProcessing ? 'Menghapus...' : 'Ya, Hapus'}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+        </div>
+      )}
+
+      {/* MODAL 3: TAMBAH / EDIT DATA ROASTER */}
+      {isRoasterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900">
+                {editingRoaster ? 'Edit Data Roaster' : 'Tambah Roaster Staff Baru'}
+              </h3>
+              <button
+                onClick={() => setIsRoasterModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRoaster} className="mt-4 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">Nama Lengkap Roaster</label>
+                <input
+                  type="text"
+                  required
+                  value={rName}
+                  onChange={(e) => setRName(e.target.value)}
+                  placeholder="Bang Malik / Fikri Roaster"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-orange-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Peran / Jabatan</label>
+                  <select
+                    value={rRole}
+                    onChange={(e) => setRRole(e.target.value as RoasterStaff['role'])}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-xs focus:border-orange-500 focus:outline-hidden"
+                  >
+                    <option value="Head Roaster">Head Roaster</option>
+                    <option value="Senior Roaster">Senior Roaster</option>
+                    <option value="Roaster Operator">Roaster Operator</option>
+                    <option value="Cupping Master">Cupping Master / Q Grader</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">No. WhatsApp / HP</label>
+                  <input
+                    type="text"
+                    required
+                    value={rPhone}
+                    onChange={(e) => setRPhone(e.target.value)}
+                    placeholder="0811-6890-2233"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-mono focus:border-orange-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">Sertifikasi & Lisensi SCA</label>
+                <input
+                  type="text"
+                  value={rCert}
+                  onChange={(e) => setRCert(e.target.value)}
+                  placeholder="SCA Roasting Professional / Q Grader Certified"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-orange-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">Spesialisasi Mesin Roasting</label>
+                <input
+                  type="text"
+                  value={rMachine}
+                  onChange={(e) => setRMachine(e.target.value)}
+                  placeholder="Mesin Roasting Rakitan Gayo 15kg / Probat"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-orange-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Shift Kerja</label>
+                  <select
+                    value={rShift}
+                    onChange={(e) => setRShift(e.target.value as RoasterStaff['shift'])}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-xs focus:border-orange-500 focus:outline-hidden"
+                  >
+                    <option value="Pagi">Shift Pagi</option>
+                    <option value="Siang">Shift Siang</option>
+                    <option value="Malam">Shift Malam</option>
+                    <option value="Flexi">Flexi / Panggilan Batch</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Status Keaktifan</label>
+                  <select
+                    value={rStatus}
+                    onChange={(e) => setRStatus(e.target.value as RoasterStaff['status'])}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-xs focus:border-orange-500 focus:outline-hidden"
+                  >
+                    <option value="Active">Active (Aktif)</option>
+                    <option value="On Leave">On Leave (Cuti)</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setIsRoasterModalOpen(false)}
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-orange-700 px-4 py-1.5 font-bold text-white hover:bg-orange-800"
+                >
+                  Simpan Data Roaster
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: TAMBAH / EDIT KEPALA GUDANG */}
+      {isWhHeadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900">
+                {editingWhHead ? 'Edit Data Kepala Gudang' : 'Tambah Kepala Gudang Baru'}
+              </h3>
+              <button
+                onClick={() => setIsWhHeadModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-700 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWhHead} className="mt-4 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">Nama Kepala Gudang</label>
+                <input
+                  type="text"
+                  required
+                  value={whName}
+                  onChange={(e) => setWhName(e.target.value)}
+                  placeholder="Tgk. Mansur"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">NIK Staff Gudang</label>
+                  <input
+                    type="text"
+                    required
+                    value={whNik}
+                    onChange={(e) => setWhNik(e.target.value)}
+                    placeholder="KFH-LHK-2026-001"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-mono focus:border-amber-600 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">No. WhatsApp / HP</label>
+                  <input
+                    type="text"
+                    required
+                    value={whPhone}
+                    onChange={(e) => setWhPhone(e.target.value)}
+                    placeholder="0812-6900-3344"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-mono focus:border-amber-600 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">Lokasi Hub Gudang Utama</label>
+                <input
+                  type="text"
+                  required
+                  value={whHub}
+                  onChange={(e) => setWhHub(e.target.value)}
+                  placeholder="Kofiara Hub Lhokseumawe"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs font-bold text-amber-950 focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">
+                  Daftar Tanggung Jawab (Pisahkan dengan koma)
+                </label>
+                <textarea
+                  rows={2}
+                  value={whRespStr}
+                  onChange={(e) => setWhRespStr(e.target.value)}
+                  placeholder="QC Kadar Air, Dispatch Grab & Loket, Stok Opname"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-amber-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">Shift Kerja</label>
+                <select
+                  value={whShift}
+                  onChange={(e) => setWhShift(e.target.value as WarehouseHead['shift'])}
+                  className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-xs focus:border-amber-600 focus:outline-hidden font-medium"
+                >
+                  <option value="Full Time">Full Time (Penanggung Jawab Utama)</option>
+                  <option value="Pagi">Shift Pagi</option>
+                  <option value="Siang">Shift Siang</option>
+                  <option value="Malam">Shift Malam</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWhHeadModalOpen(false)}
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-600 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-amber-800 px-4 py-1.5 font-bold text-white hover:bg-amber-900"
+                >
+                  Simpan Data Kepala Gudang
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

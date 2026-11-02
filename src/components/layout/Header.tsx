@@ -200,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ERP
                 </span>
               </div>
-              <span className="text-[10px] text-zinc-500 font-medium">Gayo Takengon Hub</span>
+              <span className="text-[10px] text-amber-900 font-bold">Kofiara Hub Lhokseumawe</span>
             </div>
           </div>
         </div>
@@ -340,7 +340,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="hidden md:flex items-center gap-2 text-[11px] text-zinc-500 shrink-0">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          <span>Takengon • Dataran Tinggi Gayo</span>
+          <span>Lhokseumawe • Kofiara Hub Central</span>
         </div>
       </div>
     </header>

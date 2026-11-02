@@ -23,7 +23,9 @@ import {
   ExternalLink,
   SlidersHorizontal,
   Settings,
-  Edit2
+  Edit2,
+  Zap,
+  Server
 } from 'lucide-react';
 import { CoffeeBean, Batch, InboundMovement, Partner, BusinessNotificationConfig } from '../../types/erp';
 import {
@@ -36,7 +38,8 @@ import {
   DEFAULT_NOTIFICATION_CONFIG,
   buildLowStockAlertMessage,
   buildSingleBeanLowStockMessage,
-  saveNotificationLog
+  saveNotificationLog,
+  dispatchWhatsAppNotification
 } from '../../services/dbService';
 
 interface GreenBeansWarehouseProps {
@@ -62,6 +65,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [selectedBeanForOpname, setSelectedBeanForOpname] = useState<CoffeeBean | null>(null);
 
   // Quick Inbound from Factory/Farmer Form State
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
   const [inboundPartnerName, setInboundPartnerName] = useState(
     partners.find((p) => p.type === 'Pemasok / Petani')?.name || 'Koperasi Petani Gayo Takengon'
   );
@@ -129,27 +133,44 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
     setTimeout(() => setToastMessage(''), 4000);
   };
 
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+
   const handleSendAllWhatsApp = async () => {
-    const { subject, body } = buildLowStockAlertMessage(beans, notifConfig);
-    const cleanPhone = notifConfig.businessWhatsApp.replace(/\D/g, '');
-    const formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone.startsWith('62') ? cleanPhone : '62' + cleanPhone;
-    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(body)}`;
+    setIsSendingWhatsApp(true);
+    try {
+      const { subject, body } = buildLowStockAlertMessage(beans, notifConfig);
+      const res = await dispatchWhatsAppNotification(
+        notifConfig.businessWhatsApp,
+        body,
+        notifConfig
+      );
 
-    await saveNotificationLog({
-      id: `notif-wa-stock-${Date.now().toString(36)}`,
-      channel: 'WhatsApp',
-      recipient: notifConfig.businessWhatsApp,
-      subject,
-      messagePreview: body.slice(0, 200) + '...',
-      type: 'Stock Alert',
-      status: 'Sent',
-      sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      createdAt: new Date().toISOString()
-    });
+      await saveNotificationLog({
+        id: `notif-wa-stock-${Date.now().toString(36)}`,
+        channel: 'WhatsApp',
+        recipient: notifConfig.businessWhatsApp,
+        subject,
+        messagePreview: body.slice(0, 200) + '...',
+        type: 'Stock Alert',
+        status: res.success ? 'Sent' : 'Failed',
+        sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
 
-    showToast(`Peringatan WhatsApp otomatis dikirim ke ${notifConfig.businessWhatsApp}`);
-    window.open(whatsappUrl, '_blank');
-    onRefresh();
+      if (res.channel === 'openwa' && res.success) {
+        showToast(res.message);
+      } else if (res.url) {
+        showToast(res.message);
+        window.open(res.url, '_blank');
+      } else {
+        showToast(`⚠️ ${res.error || res.message}`);
+      }
+      onRefresh();
+    } catch (err: any) {
+      showToast(`Error: ${err?.message || 'Gagal mengirim notifikasi'}`);
+    } finally {
+      setIsSendingWhatsApp(false);
+    }
   };
 
   const handleSendAllEmail = async () => {
@@ -178,24 +199,54 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const handleSendSingleBeanAlert = async (bean: CoffeeBean, channel: 'WhatsApp' | 'Email') => {
     const { subject, body, whatsappUrl, mailtoUrl } = buildSingleBeanLowStockMessage(bean, notifConfig);
 
-    await saveNotificationLog({
-      id: `notif-${channel.toLowerCase()}-${bean.id}-${Date.now().toString(36)}`,
-      channel,
-      recipient: channel === 'WhatsApp' ? notifConfig.businessWhatsApp : notifConfig.businessEmail,
-      subject,
-      messagePreview: body.slice(0, 200) + '...',
-      type: 'Stock Alert',
-      status: 'Sent',
-      sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      createdAt: new Date().toISOString()
-    });
-
-    showToast(`Peringatan stok ${bean.name} dikirim via ${channel}!`);
     if (channel === 'WhatsApp') {
-      window.open(whatsappUrl, '_blank');
+      try {
+        const res = await dispatchWhatsAppNotification(
+          notifConfig.businessWhatsApp,
+          body,
+          notifConfig
+        );
+
+        await saveNotificationLog({
+          id: `notif-wa-${bean.id}-${Date.now().toString(36)}`,
+          channel: 'WhatsApp',
+          recipient: notifConfig.businessWhatsApp,
+          subject,
+          messagePreview: body.slice(0, 200) + '...',
+          type: 'Stock Alert',
+          status: res.success ? 'Sent' : 'Failed',
+          sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+          createdAt: new Date().toISOString()
+        });
+
+        if (res.channel === 'openwa' && res.success) {
+          showToast(res.message);
+        } else if (res.url) {
+          showToast(`Peringatan stok ${bean.name} dibuka di WhatsApp`);
+          window.open(res.url, '_blank');
+        } else {
+          showToast(`⚠️ ${res.error || res.message}`);
+        }
+      } catch (err: any) {
+        showToast(`Error: ${err?.message || 'Gagal kirim pesan'}`);
+      }
     } else {
+      await saveNotificationLog({
+        id: `notif-email-${bean.id}-${Date.now().toString(36)}`,
+        channel: 'Email',
+        recipient: notifConfig.businessEmail,
+        subject,
+        messagePreview: body.slice(0, 200) + '...',
+        type: 'Stock Alert',
+        status: 'Sent',
+        sentAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
+
+      showToast(`Peringatan email stok ${bean.name} disiapkan!`);
       window.location.href = mailtoUrl;
     }
+
     setAlertDispatchModalBean(null);
     onRefresh();
   };
@@ -908,21 +959,91 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
             </div>
 
             <form onSubmit={handleCreateInbound} className="mt-4 space-y-4 text-xs">
+              {/* Select from Partner Database (Relasi) */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-emerald-950 text-xs">
+                    Pilih Pemasok dari Database Relasi / Mitra ({partners.length} Terdaftar)
+                  </label>
+                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase">
+                    Relasi ERP
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
+                      Dropdown Relasi Pemasok / Petani
+                    </label>
+                    <select
+                      value={selectedPartnerId}
+                      onChange={(e) => {
+                        const pid = e.target.value;
+                        setSelectedPartnerId(pid);
+                        const found = partners.find((p) => p.id === pid);
+                        if (found) {
+                          setInboundPartnerName(found.name);
+                          if (found.address) setInboundOrigin(found.address);
+                        }
+                      }}
+                      className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 font-medium text-xs focus:border-emerald-600 focus:outline-hidden"
+                    >
+                      <option value="">-- Pilih dari Daftar Relasi Terdaftar --</option>
+                      {partners.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          [{p.type || p.category || 'Relasi'}] {p.name} - {p.phone || 'No Telp'}
+                        </option>
+                      ))}
+                      <option value="custom">-- Ketik Supplier Baru / Custom --</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
+                      Nama Pemasok / Pabrik (Terisi Otomatis / Edit)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={inboundPartnerName}
+                      onChange={(e) => {
+                        setInboundPartnerName(e.target.value);
+                        setSelectedPartnerId('');
+                      }}
+                      placeholder="cth: Koperasi Kopi Gayo Takengon"
+                      className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 font-bold focus:border-emerald-600 focus:outline-hidden text-zinc-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bean selection from master beans or custom */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Pemasok / Pabrik / Petani</label>
-                  <input
-                    type="text"
-                    required
-                    value={inboundPartnerName}
-                    onChange={(e) => setInboundPartnerName(e.target.value)}
-                    placeholder="cth: Koperasi Kopi Gayo Takengon"
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
-                  />
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Pilih Biji Kopi dari Master ({beans.length} SKU)
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      const b = beans.find((item) => item.id === e.target.value);
+                      if (b) {
+                        setInboundBeanName(b.name);
+                        if (b.origin) setInboundOrigin(b.origin);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
+                  >
+                    <option value="">-- Pilih Biji Kopi Master --</option>
+                    {beans.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.process}) - Sisa {b.stockGreenKg} kg
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Nama Varietas / Jenis Kopi</label>
+                  <label className="block font-semibold text-zinc-700 mb-1">Nama Varietas / Biji</label>
                   <input
                     type="text"
                     required
@@ -977,7 +1098,8 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   <label className="block font-bold text-emerald-950 mb-1">Total Berat (kg)</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0.01"
+                    step="any"
                     required
                     value={inboundWeightKg}
                     onChange={(e) => setInboundWeightKg(Number(e.target.value))}
@@ -1182,7 +1304,8 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 <div className="relative">
                   <input
                     type="number"
-                    min="1"
+                    min="0.01"
+                    step="any"
                     value={tempThresholdKg}
                     onChange={(e) => setTempThresholdKg(Number(e.target.value))}
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 font-mono font-bold text-base text-zinc-900 focus:border-amber-600 focus:outline-hidden"

@@ -22,7 +22,9 @@ import {
   OutboundMovement,
   PricingTier,
   QrisPaymentConfig,
-  BusinessNotificationConfig
+  BusinessNotificationConfig,
+  OpenWaConfig,
+  WhatsAppProvider
 } from '../types/erp';
 import {
   ACEH_LOKET_PRESETS,
@@ -1056,6 +1058,15 @@ export function subscribeToQrisConfig(
 // -------------------------------------------------------------
 // KONFIGURASI NOTIFIKASI BISNIS & AUTOMATISASI STOK MENIPIS GUDANG
 // -------------------------------------------------------------
+export const DEFAULT_OPENWA_CONFIG: OpenWaConfig = {
+  enabled: false,
+  provider: 'direct',
+  serverUrl: 'http://localhost:8080',
+  apiKey: '',
+  sessionId: 'kopiflow',
+  autoFallbackToDirect: true
+};
+
 export const DEFAULT_NOTIFICATION_CONFIG: BusinessNotificationConfig = {
   businessWhatsApp: '6281269008899',
   businessEmail: 'afifviatnazillah19@gmail.com',
@@ -1064,6 +1075,7 @@ export const DEFAULT_NOTIFICATION_CONFIG: BusinessNotificationConfig = {
   defaultMinThresholdKg: 100,
   notifyOnGreenLow: true,
   notifyOnRoastedLow: true,
+  openWa: DEFAULT_OPENWA_CONFIG,
   updatedAt: new Date().toISOString()
 };
 
@@ -1266,3 +1278,166 @@ export async function triggerAutoLowStockCheck(
   };
 }
 
+// -------------------------------------------------------------
+// OPENWA (@open-wa/wa-automate) REST API INTEGRATION & AUTOMATION
+// -------------------------------------------------------------
+export interface SendWhatsAppResult {
+  success: boolean;
+  channel: 'openwa' | 'direct';
+  message: string;
+  url?: string;
+  error?: string;
+}
+
+/**
+ * Pings OpenWA REST API server to verify if the server daemon is alive and session is active.
+ * Standard endpoints on OpenWA servers include /ping, /getMe, or /status
+ */
+export async function testOpenWaConnection(
+  serverUrl: string,
+  apiKey?: string
+): Promise<{ ok: boolean; statusText: string }> {
+  if (!serverUrl || !serverUrl.trim()) {
+    return { ok: false, statusText: 'URL Server OpenWA belum diisi' };
+  }
+
+  const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (apiKey?.trim()) {
+    headers['Authorization'] = `Bearer ${apiKey.trim()}`;
+    headers['api_key'] = apiKey.trim();
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+  try {
+    // Attempt 1: Ping endpoint
+    const res = await fetch(`${cleanUrl}/ping`, {
+      method: 'GET',
+      headers,
+      signal: controller.signal
+    }).catch(() => null);
+
+    clearTimeout(timeoutId);
+
+    if (res && (res.ok || res.status === 200)) {
+      return { ok: true, statusText: 'Online (OpenWA REST API Terhubung)' };
+    }
+
+    // Attempt 2: getMe or root healthcheck
+    const controller2 = new AbortController();
+    const timeout2 = setTimeout(() => controller2.abort(), 3500);
+    const res2 = await fetch(`${cleanUrl}/getMe`, {
+      method: 'GET',
+      headers,
+      signal: controller2.signal
+    }).catch(() => null);
+    clearTimeout(timeout2);
+
+    if (res2 && (res2.ok || res2.status === 200)) {
+      return { ok: true, statusText: 'Online (Session WhatsApp Terautentikasi)' };
+    }
+
+    return {
+      ok: false,
+      statusText: res
+        ? `Server merespon HTTP ${res.status}`
+        : 'Server OpenWA tidak merespon (Pastikan server aktif di port target & CORS diizinkan)'
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    return {
+      ok: false,
+      statusText: err?.message || 'Gagal tersambung (Koneksi ditolak / Offline)'
+    };
+  }
+}
+
+/**
+ * Dispatches a WhatsApp message.
+ * If OpenWA is configured and enabled, sends an automated headless HTTP POST request.
+ * If OpenWA fails or is disabled, gracefully falls back or opens wa.me.
+ */
+export async function dispatchWhatsAppNotification(
+  phone: string,
+  text: string,
+  config?: BusinessNotificationConfig
+): Promise<SendWhatsAppResult> {
+  const currentConfig = config || getNotificationConfig();
+  const openWa = currentConfig.openWa;
+  const directLink = buildWhatsAppLink(phone, text);
+
+  // If OpenWA is not enabled or user chose direct mode
+  if (!openWa || !openWa.enabled || openWa.provider !== 'openwa' || !openWa.serverUrl?.trim()) {
+    return {
+      success: true,
+      channel: 'direct',
+      url: directLink,
+      message: 'Membuka tautan WhatsApp Direct (wa.me)'
+    };
+  }
+
+  const cleanServerUrl = openWa.serverUrl.trim().replace(/\/+$/, '');
+  const formattedPhone = formatPhoneNumber(phone);
+  const chatId = `${formattedPhone}@c.us`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (openWa.apiKey?.trim()) {
+    headers['Authorization'] = `Bearer ${openWa.apiKey.trim()}`;
+    headers['api_key'] = openWa.apiKey.trim();
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+  try {
+    // OpenWA REST standard payload: POST /sendText { chatId: '628xxx@c.us', text: '...' }
+    const response = await fetch(`${cleanServerUrl}/sendText`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        chatId,
+        text
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      return {
+        success: true,
+        channel: 'openwa',
+        message: `Pesan otomatis terkirim via OpenWA REST API ke ${chatId} tanpa membuka browser!`
+      };
+    } else {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`OpenWA HTTP ${response.status}: ${errText || response.statusText}`);
+    }
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    console.warn('OpenWA dispatch error:', err?.message || err);
+
+    if (openWa.autoFallbackToDirect) {
+      return {
+        success: true,
+        channel: 'direct',
+        url: directLink,
+        message: `Server OpenWA offline (${err?.message || 'Unreachable'}), otomatis dialihkan ke WhatsApp Direct (wa.me).`,
+        error: err?.message
+      };
+    }
+
+    return {
+      success: false,
+      channel: 'openwa',
+      error: err?.message || 'Gagal mengirim pesan via OpenWA',
+      message: `Gagal mengirim via OpenWA: ${err?.message || 'Periksa server OpenWA Anda'}`
+    };
+  }
+}
