@@ -43,6 +43,7 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
   const [bagWeightKg, setBagWeightKg] = useState<number>(60);
   const [supplierOrFarmer, setSupplierOrFarmer] = useState<string>('');
   const [harvestDate, setHarvestDate] = useState<string>('2026-05-15');
+  const [receivedDate, setReceivedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [moistureContent, setMoistureContent] = useState<number>(11.2);
   const [densityGramsPerLiter, setDensityGramsPerLiter] = useState<number>(710);
   const [warehouseLocation, setWarehouseLocation] = useState<string>('Silo A - Bay 2');
@@ -76,7 +77,7 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
       bagWeightKg,
       supplierOrFarmer: supplierOrFarmer || 'Koperasi Petani Mitra KopiFlow',
       harvestDate,
-      receivedDate: new Date().toISOString().split('T')[0],
+      receivedDate: receivedDate || new Date().toISOString().split('T')[0],
       moistureContent: Number(moistureContent),
       densityGramsPerLiter: Number(densityGramsPerLiter),
       warehouseLocation,
@@ -390,8 +391,8 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
 
       {/* New Lot Intake Modal */}
       {isNewLotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 shadow-2xl my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div>
                 <h3 className="text-base font-bold text-zinc-900">Penerimaan & Intake Panen Baru</h3>
@@ -478,7 +479,35 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Tanggal Penerimaan (Inbound)</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-medium text-zinc-800 focus:border-amber-500 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Tanggal Panen / Harvest</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={harvestDate}
+                    onChange={(e) => setHarvestDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-medium text-zinc-800 focus:border-amber-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">Kadar Air (%)</label>
                   <input
@@ -495,15 +524,6 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                     type="number"
                     value={densityGramsPerLiter}
                     onChange={(e) => setDensityGramsPerLiter(Number(e.target.value))}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Tanggal Panen</label>
-                  <input
-                    type="date"
-                    value={harvestDate}
-                    onChange={(e) => setHarvestDate(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>

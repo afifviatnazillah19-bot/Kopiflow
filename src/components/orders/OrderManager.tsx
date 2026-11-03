@@ -18,7 +18,8 @@ import {
   QrCode,
   Package,
   MapPin,
-  Truck
+  Truck,
+  Calendar
 } from 'lucide-react';
 import { ShippingLabelModal } from '../logistics/ShippingLabelModal';
 import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
@@ -102,6 +103,7 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
   const [grabOrderPin, setGrabOrderPin] = useState('');
   const [discount, setDiscount] = useState<number>(0);
   const [shippingCost, setShippingCost] = useState<number>(35000);
+  const [orderDate, setOrderDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
 
   React.useEffect(() => {
@@ -232,7 +234,7 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
       grandTotal,
       status: 'Confirmed',
       paymentStatus: 'Paid in Full',
-      orderDate: new Date().toISOString().split('T')[0],
+      orderDate: orderDate || new Date().toISOString().split('T')[0],
       notes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -726,8 +728,8 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
 
       {/* New Sales Order Modal */}
       {isNewOrderModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 shadow-2xl my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div>
                 <h3 className="text-base font-bold text-zinc-900">Buat Pesanan Penjualan Baru</h3>
@@ -828,6 +830,19 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Tanggal Pesanan</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={orderDate}
+                    onChange={(e) => setOrderDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-medium text-zinc-800 focus:border-amber-500 focus:outline-hidden"
+                  />
+                </div>
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">No. WhatsApp</label>
                   <input

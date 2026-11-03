@@ -71,6 +71,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
   const [inbLocation, setInbLocation] = useState('Silo A - Bay 1 Takengon');
   const [inbDeliveryNote, setInbDeliveryNote] = useState('SJ/PETANI/X/2026/01');
   const [inbReceivedBy, setInbReceivedBy] = useState('Tgk. Mansur (QC Gudang)');
+  const [inbDate, setInbDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [inbNotes, setInbNotes] = useState('Kopi beras kering giling, kadar air stabil, kemasan karung bersih.');
 
   // Outbound Form State
@@ -78,6 +79,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
   const [outBeanId, setOutBeanId] = useState(beans[0]?.id || '');
   const [outItemType, setOutItemType] = useState<'Green Bean' | 'Roasted Bean' | 'Ground'>('Green Bean');
   const [outQuantityKg, setOutQuantityKg] = useState<number>(60);
+  const [outDate, setOutDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [outLoketName, setOutLoketName] = useState(
     acehLokets[0]?.name || 'Loket CV. Mentari Kargo L300 Gayo'
   );
@@ -125,7 +127,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
     const newMovement: InboundMovement = {
       id: `inb-${Date.now().toString(36)}`,
       docNumber,
-      date: new Date().toISOString().split('T')[0],
+      date: inbDate,
       partnerId: inbPartnerId,
       partnerName: supplier ? supplier.name : 'Petani Kopi Mitra',
       beanId: inbBeanId,
@@ -160,7 +162,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
     const newMovement: OutboundMovement = {
       id: `out-${Date.now().toString(36)}`,
       docNumber,
-      date: new Date().toISOString().split('T')[0],
+      date: outDate,
       partnerId: outPartnerId,
       partnerName: customer ? customer.name : 'Pelanggan Kedai',
       beanId: outBeanId,
@@ -512,8 +514,8 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
 
       {/* MODAL 1: CATAT BARANG MASUK (INBOUND) */}
       {isInboundModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 shadow-2xl my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div>
                 <h3 className="text-base font-bold text-zinc-900">
@@ -532,7 +534,21 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
             </div>
 
             <form onSubmit={handleCreateInbound} className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Tanggal Masuk (Inbound)</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={inbDate}
+                    onChange={(e) => setInbDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-medium text-zinc-800 focus:border-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">
                     Pilih Petani / Pemasok
@@ -540,7 +556,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
                   <select
                     value={inbPartnerId}
                     onChange={(e) => setInbPartnerId(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-emerald-500 focus:outline-hidden"
                   >
                     {suppliers.length === 0 ? (
                       <option value="">(Belum ada pemasok - Tambah di Data Relasi)</option>
@@ -559,7 +575,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
                   <select
                     value={inbBeanId}
                     onChange={(e) => setInbBeanId(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-emerald-500 focus:outline-hidden"
                   >
                     {beans.length === 0 ? (
                       <option value="">(Belum ada master biji - Tambah di Inventaris)</option>
@@ -689,8 +705,8 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
 
       {/* MODAL 2: CATAT BARANG KELUAR (OUTBOUND - LOKET ACEH) */}
       {isOutboundModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 shadow-2xl my-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div>
                 <h3 className="text-base font-bold text-zinc-900">
@@ -709,7 +725,21 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
             </div>
 
             <form onSubmit={handleCreateOutbound} className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Tanggal Keluar / Kirim</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={outDate}
+                    onChange={(e) => setOutDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-medium text-zinc-800 focus:border-amber-500 focus:outline-hidden"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">
                     Pilih Pelanggan / Kedai

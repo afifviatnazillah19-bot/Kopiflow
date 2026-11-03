@@ -16,7 +16,8 @@ import {
   Wrench,
   Cpu,
   Gauge,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Calendar
 } from 'lucide-react';
 import { RoastLog, CoffeeBean, Batch, RoastLevel, RoastStatus } from '../../types/erp';
 import { RoastCurveChart } from './RoastCurveChart';
@@ -73,6 +74,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
   const [cuppingScore, setCuppingScore] = useState<number>(87.5);
   const [cuppingNotes, setCuppingNotes] = useState<string>('Bergamot, orange blossom, brown sugar sweetness, crisp malic acidity');
   const [roasterOperator, setRoasterOperator] = useState<string>('Hendra Setiawan (Head Roaster)');
+  const [roastDate, setRoastDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [roastStatus, setRoastStatus] = useState<RoastStatus>('Passed QC');
 
   // Calculations
@@ -122,7 +124,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
       cuppingScore,
       cuppingNotes,
       roasterOperator,
-      roastDate: new Date().toISOString().split('T')[0],
+      roastDate: roastDate || new Date().toISOString().split('T')[0],
       status: roastStatus,
       createdAt: new Date().toISOString()
     };
@@ -682,6 +684,33 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Tanggal Roasting Picker (Bisa Diatur) */}
+              <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-orange-100 rounded-lg text-orange-700">
+                    <Calendar className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-orange-950 text-xs">
+                      Tanggal Sesi Roasting / Sangrai (Bisa Diatur):
+                    </label>
+                    <span className="text-[10px] text-zinc-500">
+                      Tentukan tanggal pengerjaan batch sangrai (hari ini / tanggal sebelumnya)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-56">
+                  <input
+                    type="date"
+                    required
+                    value={roastDate}
+                    onChange={(e) => setRoastDate(e.target.value)}
+                    className="w-full rounded-lg border border-orange-300 bg-white px-3 py-1.5 font-mono font-bold text-xs text-zinc-900 focus:border-orange-600 focus:outline-hidden shadow-2xs"
+                  />
                 </div>
               </div>
 

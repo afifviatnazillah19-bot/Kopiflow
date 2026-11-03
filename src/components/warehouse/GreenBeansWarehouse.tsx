@@ -84,6 +84,8 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [inboundStorageLoc, setInboundStorageLoc] = useState('Silo A-01 (Palet Kayu Terlindung)');
   const [inboundSupplierNote, setInboundSupplierNote] = useState('Surat Jalan Pabrik No. SJ-PBR/2026/089');
   const [inboundReceiver, setInboundReceiver] = useState('Aman Fauzi (Staff Gudang Mentah)');
+  const [inboundDate, setInboundDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [inboundHarvestDate, setInboundHarvestDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Direct Stock Opname form
   const [editGreenStock, setEditGreenStock] = useState<number>(0);
@@ -329,7 +331,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
     const newInbound: InboundMovement = {
       id: inboundId,
       docNumber: `INB-PABRIK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: new Date().toISOString().split('T')[0],
+      date: inboundDate,
       partnerId: partners.find((p) => p.name === inboundPartnerName)?.id || 'partner-pabrik',
       partnerName: inboundPartnerName,
       beanId: targetBean.id,
@@ -357,8 +359,8 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
       bagCount: Number(inboundBagCount),
       bagWeightKg: Math.round(Number(inboundWeightKg) / Math.max(1, Number(inboundBagCount))),
       supplierOrFarmer: inboundPartnerName,
-      harvestDate: new Date().toISOString().split('T')[0],
-      receivedDate: new Date().toISOString().split('T')[0],
+      harvestDate: inboundHarvestDate,
+      receivedDate: inboundDate,
       moistureContent: Number(inboundMoisture),
       densityGramsPerLiter: Number(inboundDensity),
       warehouseLocation: inboundStorageLoc,
@@ -1052,6 +1054,43 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     placeholder="cth: Arabika Gayo Specialty Grade 1"
                     className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
                   />
+                </div>
+              </div>
+
+              {/* Tanggal Penerimaan Green Beans & Tanggal Panen */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-zinc-50/80 p-3 rounded-xl border border-zinc-200">
+                <div>
+                  <label className="block font-bold text-zinc-800 text-[11px] mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>Tanggal Penerimaan Green Beans (di Gudang)</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={inboundDate}
+                    onChange={(e) => setInboundDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 font-mono text-xs text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                  <span className="text-[10px] text-zinc-500 mt-0.5 block">
+                    Bisa diatur jika mencatat penerimaan kemarin / sesuai surat jalan.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-zinc-800 text-[11px] mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-amber-700" />
+                    <span>Tanggal Panen / Masuk Lot (Harvest Date)</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={inboundHarvestDate}
+                    onChange={(e) => setInboundHarvestDate(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 font-mono text-xs text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                  <span className="text-[10px] text-zinc-500 mt-0.5 block">
+                    Estimasi waktu petik buah ceri dari kebun/petani.
+                  </span>
                 </div>
               </div>
 

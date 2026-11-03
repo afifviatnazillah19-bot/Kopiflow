@@ -206,15 +206,15 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Center: Quick Command Search */}
-        <div className="flex-1 max-w-md mx-2">
+        <div className="flex-1 max-w-md mx-1 sm:mx-2 min-w-0">
           <div className="relative group">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 group-focus-within:text-amber-600 transition-colors" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Cari data kopi, lot, faktur, sopir loket..."
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50/80 pl-8 pr-12 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-amber-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 transition-all shadow-2xs"
+              placeholder="Cari data kopi, lot, faktur, sopir..."
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50/80 pl-8 pr-3 sm:pr-12 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-amber-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 transition-all shadow-2xs truncate"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[9px] font-mono text-zinc-400 shadow-2xs">
               <Command className="h-2.5 w-2.5" />
