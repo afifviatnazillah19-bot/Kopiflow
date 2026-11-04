@@ -582,7 +582,7 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
                     ) : (
                       beans.map((b) => (
                         <option key={b.id} value={b.id}>
-                          {b.name} ({b.process})
+                          {b.name} ({b.variety} • {b.process})
                         </option>
                       ))
                     )}

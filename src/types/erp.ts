@@ -1,5 +1,53 @@
-export type CoffeeProcess = 'Washed' | 'Natural' | 'Honey' | 'Anaerobic' | 'Wet Hulled' | 'Full Wash';
+export type CoffeeProcess =
+  | 'Semi Wash'
+  | 'Wet Hulled'
+  | 'Full Wash'
+  | 'Washed'
+  | 'Natural'
+  | 'Honey'
+  | 'Anaerobic'
+  | 'Anaerobic Natural'
+  | 'Anaerobic Washed'
+  | 'Anaerobic Slow Dry'
+  | 'Wine Process'
+  | 'Carbonic Maceration'
+  | string;
 export type CoffeeGrade = 'Grade 1' | 'Specialty' | 'Commercial' | 'Micro-lot';
+
+export const COMMON_COFFEE_PROCESSES = [
+  'Semi Wash',
+  'Wet Hulled',
+  'Full Wash',
+  'Washed',
+  'Natural',
+  'Honey',
+  'Anaerobic',
+  'Anaerobic Natural',
+  'Anaerobic Washed',
+  'Anaerobic Slow Dry',
+  'Wine Process',
+  'Carbonic Maceration'
+] as const;
+
+export const COMMON_COFFEE_VARIETIES = [
+  'Timtim',
+  'Ateng Super',
+  'Bourbon',
+  'Typica',
+  'Catimor',
+  'Sigarar Utang',
+  'Longberry Gayo',
+  'Kartika',
+  'Gayo 1',
+  'Gayo 2',
+  'Abisinia',
+  'Maragogype',
+  'Geisha',
+  'P-88',
+  'Yellow Caturra',
+  'Robusta Dampit',
+  'Liberika Riau'
+] as const;
 export type PricingTier = 'Lokal' | 'UMKM' | 'Luar Pulau';
 export type BatchStatus = 'In Stock' | 'Depleted' | 'In Roasting' | 'Quarantine';
 export type RoastLevel = 'Light' | 'Medium-Light' | 'Medium' | 'Medium-Dark' | 'Dark';

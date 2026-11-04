@@ -665,7 +665,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   >
                     {beans.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.process})
+                        {b.name} ({b.variety} • {b.process})
                       </option>
                     ))}
                   </select>

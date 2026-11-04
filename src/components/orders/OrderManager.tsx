@@ -1112,7 +1112,7 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                         >
                           {beans.map((b) => (
                             <option key={b.id} value={b.id}>
-                              {b.name}
+                              {b.name} ({b.variety} • {b.process})
                             </option>
                           ))}
                         </select>

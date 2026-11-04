@@ -27,7 +27,16 @@ import {
   Zap,
   Server
 } from 'lucide-react';
-import { CoffeeBean, Batch, InboundMovement, Partner, BusinessNotificationConfig } from '../../types/erp';
+import {
+  CoffeeBean,
+  Batch,
+  InboundMovement,
+  Partner,
+  BusinessNotificationConfig,
+  CoffeeProcess,
+  COMMON_COFFEE_PROCESSES,
+  COMMON_COFFEE_VARIETIES
+} from '../../types/erp';
 import {
   formatIDR,
   saveBean,
@@ -71,8 +80,10 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   );
   const [inboundBeanName, setInboundBeanName] = useState(beans[0]?.name || 'Arabika Gayo Specialty Grade 1');
   const [inboundOrigin, setInboundOrigin] = useState('Takengon, Aceh Tengah (1,500 mdpl)');
-  const [inboundVariety, setInboundVariety] = useState('Tim-tim & Bourbon');
-  const [inboundProcess, setInboundProcess] = useState<'Wet Hulled' | 'Washed' | 'Natural' | 'Honey'>('Wet Hulled');
+  const [inboundVariety, setInboundVariety] = useState('Timtim & Ateng Super');
+  const [inboundProcess, setInboundProcess] = useState<string>('Semi Wash');
+  const [isCustomInboundProcess, setIsCustomInboundProcess] = useState(false);
+  const [customInboundProcessInput, setCustomInboundProcessInput] = useState('');
   const [inboundLotNumber, setInboundLotNumber] = useState(
     `LOT-GY-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
   );
@@ -87,7 +98,13 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [inboundDate, setInboundDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [inboundHarvestDate, setInboundHarvestDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
-  // Direct Stock Opname form
+  // Direct Stock Opname & Edit Biji Master form
+  const [editBeanName, setEditBeanName] = useState('');
+  const [editVariety, setEditVariety] = useState('');
+  const [editProcess, setEditProcess] = useState<string>('Semi Wash');
+  const [isCustomEditProcess, setIsCustomEditProcess] = useState(false);
+  const [editOrigin, setEditOrigin] = useState('');
+  const [editGrade, setEditGrade] = useState('Specialty');
   const [editGreenStock, setEditGreenStock] = useState<number>(0);
   const [editMinAlert, setEditMinAlert] = useState<number>(100);
   const [editMoisture, setEditMoisture] = useState<number>(11.2);
@@ -108,6 +125,12 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
 
   const handleOpenOpname = (b: CoffeeBean) => {
     setSelectedBeanForOpname(b);
+    setEditBeanName(b.name);
+    setEditVariety(b.variety);
+    setEditProcess(b.process);
+    setIsCustomEditProcess(!COMMON_COFFEE_PROCESSES.includes(b.process as any));
+    setEditOrigin(b.origin);
+    setEditGrade(b.grade);
     setEditGreenStock(b.stockGreenKg);
     setEditMinAlert(b.minAlertKg);
     setEditMoisture(b.moistureAvgPercent);
@@ -277,8 +300,14 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
     if (!selectedBeanForOpname) return;
 
     const target = selectedBeanForOpname;
+    const finalProcess = isCustomEditProcess && editProcess.trim() ? editProcess.trim() : editProcess;
     const updated: CoffeeBean = {
       ...target,
+      name: editBeanName.trim() || target.name,
+      variety: editVariety.trim() || target.variety,
+      process: finalProcess || target.process,
+      origin: editOrigin.trim() || target.origin,
+      grade: (editGrade as any) || target.grade,
       stockGreenKg: Number(editGreenStock),
       minAlertKg: Number(editMinAlert),
       moistureAvgPercent: Number(editMoisture),
@@ -288,7 +317,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
 
     // Tutup modal langsung seketika
     setSelectedBeanForOpname(null);
-    showToast(`Stok opname ${target.name} berhasil diperbarui menjadi ${updated.stockGreenKg} kg.`);
+    showToast(`Data biji & stok opname "${updated.name}" (${updated.variety} • ${updated.process}) berhasil disimpan!`);
 
     await saveBean(updated);
     onRefresh();
@@ -300,6 +329,12 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
     // Tutup menu modal langsung seketika agar user tidak menunggu
     setIsNewInboundModalOpen(false);
 
+    const finalProcess =
+      isCustomInboundProcess && customInboundProcessInput.trim()
+        ? customInboundProcessInput.trim()
+        : inboundProcess;
+    const finalVariety = inboundVariety.trim() || 'Timtim & Ateng Super';
+
     // Find or create matching bean
     let targetBean = beans.find(
       (b) => b.name.toLowerCase().trim() === inboundBeanName.toLowerCase().trim()
@@ -310,8 +345,8 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
         id: `bean-${Date.now().toString(36)}`,
         name: inboundBeanName,
         origin: inboundOrigin,
-        variety: inboundVariety,
-        process: inboundProcess,
+        variety: finalVariety,
+        process: finalProcess,
         grade: 'Specialty',
         stockGreenKg: 0,
         stockRoastedKg: 0,
@@ -325,6 +360,23 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
         createdAt: new Date().toISOString()
       };
       await saveBean(targetBean);
+    } else {
+      // If user provided custom variety or process, update master bean
+      let changed = false;
+      const updatedBean = { ...targetBean };
+      if (finalVariety && targetBean.variety !== finalVariety) {
+        updatedBean.variety = finalVariety;
+        changed = true;
+      }
+      if (finalProcess && targetBean.process !== finalProcess) {
+        updatedBean.process = finalProcess;
+        changed = true;
+      }
+      if (changed) {
+        updatedBean.updatedAt = new Date().toISOString();
+        await saveBean(updatedBean);
+        targetBean = updatedBean;
+      }
     }
 
     const inboundId = `inb-${Date.now().toString(36)}`;
@@ -642,14 +694,21 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
             <select
               value={varietyFilter}
               onChange={(e) => setVarietyFilter(e.target.value)}
-              className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs text-zinc-700 bg-white focus:border-emerald-600 focus:outline-hidden"
+              className="rounded-xl border border-zinc-200 px-3 py-1.5 text-xs text-zinc-700 bg-white focus:border-emerald-600 focus:outline-hidden font-medium"
             >
               <option value="all">Semua Proses</option>
+              <option value="Semi Wash">Semi Wash</option>
               <option value="Wet Hulled">Wet Hulled (Giling Basah)</option>
+              <option value="Full Wash">Full Wash</option>
               <option value="Washed">Fully Washed</option>
               <option value="Natural">Natural / Dry</option>
               <option value="Honey">Honey</option>
               <option value="Anaerobic">Anaerobic</option>
+              <option value="Anaerobic Natural">Anaerobic Natural</option>
+              <option value="Anaerobic Washed">Anaerobic Washed</option>
+              <option value="Anaerobic Slow Dry">Anaerobic Slow Dry (ASD)</option>
+              <option value="Wine Process">Wine Process</option>
+              <option value="Carbonic Maceration">Carbonic Maceration</option>
             </select>
 
             <button
@@ -1031,6 +1090,14 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                       if (b) {
                         setInboundBeanName(b.name);
                         if (b.origin) setInboundOrigin(b.origin);
+                        if (b.variety) setInboundVariety(b.variety);
+                        if (b.process) {
+                          setInboundProcess(b.process);
+                          setIsCustomInboundProcess(!COMMON_COFFEE_PROCESSES.includes(b.process as any));
+                          if (!COMMON_COFFEE_PROCESSES.includes(b.process as any)) {
+                            setCustomInboundProcessInput(b.process);
+                          }
+                        }
                       }
                     }}
                     className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
@@ -1038,22 +1105,83 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     <option value="">-- Pilih Biji Kopi Master --</option>
                     {beans.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.process}) - Sisa {b.stockGreenKg} kg
+                        {b.name} ({b.variety} • {b.process}) - Sisa {b.stockGreenKg} kg
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Nama Varietas / Biji</label>
+                  <label className="block font-semibold text-zinc-700 mb-1">
+                    Nama Biji Kopi / SKU Produk
+                  </label>
                   <input
                     type="text"
                     required
                     value={inboundBeanName}
                     onChange={(e) => setInboundBeanName(e.target.value)}
-                    placeholder="cth: Arabika Gayo Specialty Grade 1"
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    placeholder="cth: Arabika Gayo Pantan Musara Specialty"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden font-medium"
                   />
+                </div>
+              </div>
+
+              {/* INPUT NAMA VARIETAS (BEBAS KETIK SENDIRI / REKOMENDASI CEPAT) */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                  <label className="block font-bold text-emerald-950 text-xs">
+                    Nama Varietas Biji Kopi (Bisa Isi / Ketik Bebas)
+                  </label>
+                  <span className="text-[10px] text-emerald-700">
+                    Ketik manual atau klik rekomendasi di bawah
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  list="warehouse-variety-datalist"
+                  value={inboundVariety}
+                  onChange={(e) => setInboundVariety(e.target.value)}
+                  placeholder="Ketik nama varietas, cth: Timtim, Ateng Super, Bourbon, Typica, Sigarar Utang..."
+                  className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 font-medium text-xs text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
+                />
+                <datalist id="warehouse-variety-datalist">
+                  {COMMON_COFFEE_VARIETIES.map((v) => (
+                    <option key={v} value={v} />
+                  ))}
+                  <option value="Timtim & Ateng Super" />
+                  <option value="Bourbon & P-88" />
+                  <option value="Typica & S-795" />
+                  <option value="Sigarar Utang Multi-Variety" />
+                </datalist>
+
+                {/* Quick variety pills */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] font-semibold text-emerald-900">Pilihan Cepat:</span>
+                  {[
+                    'Timtim',
+                    'Ateng Super',
+                    'Bourbon',
+                    'Typica',
+                    'Catimor',
+                    'Sigarar Utang',
+                    'Longberry Gayo',
+                    'Gayo 1',
+                    'Abisinia'
+                  ].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setInboundVariety(v)}
+                      className={`rounded-md px-2 py-0.5 text-[11px] font-medium border transition-colors ${
+                        inboundVariety === v
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:border-emerald-400 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1094,6 +1222,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 </div>
               </div>
 
+              {/* Lot Number, Proses Pascapanen, dan Asal/Elevasi */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">Nomor Lot / Batch Panen</label>
@@ -1109,15 +1238,64 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">Proses Pascapanen</label>
                   <select
-                    value={inboundProcess}
-                    onChange={(e) => setInboundProcess(e.target.value as any)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    value={isCustomInboundProcess ? '__custom__' : inboundProcess}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomInboundProcess(true);
+                      } else {
+                        setIsCustomInboundProcess(false);
+                        setInboundProcess(e.target.value);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden font-medium"
                   >
-                    <option value="Wet Hulled">Wet Hulled (Giling Basah Gayo)</option>
-                    <option value="Washed">Fully Washed</option>
+                    <option value="Semi Wash">Semi Wash (Giling Basah Gayo)</option>
+                    <option value="Wet Hulled">Wet Hulled</option>
+                    <option value="Full Wash">Full Wash (Fully Washed)</option>
+                    <option value="Washed">Washed</option>
                     <option value="Natural">Natural / Dry</option>
                     <option value="Honey">Honey</option>
+                    <option value="Anaerobic">Anaerobic</option>
+                    <option value="Anaerobic Natural">Anaerobic Natural</option>
+                    <option value="Anaerobic Washed">Anaerobic Washed</option>
+                    <option value="Anaerobic Slow Dry">Anaerobic Slow Dry (ASD)</option>
+                    <option value="Wine Process">Wine Process</option>
+                    <option value="Carbonic Maceration">Carbonic Maceration</option>
+                    <option value="__custom__">-- Tulis Proses Kustom Lainnya --</option>
                   </select>
+
+                  {isCustomInboundProcess && (
+                    <input
+                      type="text"
+                      autoFocus
+                      required
+                      value={customInboundProcessInput}
+                      onChange={(e) => setCustomInboundProcessInput(e.target.value)}
+                      placeholder="Ketik nama proses khusus..."
+                      className="mt-1.5 w-full rounded-lg border border-amber-400 bg-amber-50/50 px-2.5 py-1 text-xs text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                    />
+                  )}
+
+                  {/* Quick process pills */}
+                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                    {['Semi Wash', 'Anaerobic', 'Anaerobic Natural', 'Full Wash', 'Natural', 'Honey', 'Wine Process'].map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setIsCustomInboundProcess(false);
+                          setInboundProcess(p);
+                        }}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium border ${
+                          inboundProcess === p && !isCustomInboundProcess
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -1247,59 +1425,229 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
         </div>
       )}
 
-      {/* Modal: Direct Stock Opname */}
+      {/* Modal: Direct Stock Opname & Edit Master Bean */}
       {selectedBeanForOpname && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200">
-            <h3 className="text-base font-bold text-zinc-900">
-              Opname Stok Green Beans: {selectedBeanForOpname.name}
-            </h3>
-            <p className="text-xs text-zinc-500 mt-1">
-              Sesuaikan hasil hitung fisik di gudang mentah Takengon.
-            </p>
-
-            <form onSubmit={handleSaveOpname} className="mt-4 space-y-3 text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-zinc-200 my-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div>
-                <label className="block font-semibold text-zinc-700 mb-1">Stok Fisik Green Beans (kg)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editGreenStock}
-                  onChange={(e) => setEditGreenStock(Number(e.target.value))}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono font-bold text-sm focus:border-emerald-600 focus:outline-hidden"
-                />
+                <h3 className="text-base font-bold text-zinc-900">
+                  Edit Master Biji & Opname Stok: {selectedBeanForOpname.name}
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Ubah nama varietas, proses pascapanen, mutu, serta sesuaikan stok fisik gudang.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBeanForOpname(null)}
+                className="text-zinc-400 hover:text-zinc-700 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveOpname} className="mt-4 space-y-3.5 text-xs">
+              {/* Nama Biji & Asal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Nama Biji Kopi / SKU</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBeanName}
+                    onChange={(e) => setEditBeanName(e.target.value)}
+                    placeholder="cth: Aceh Gayo Pantan Musara"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-medium focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Asal / Daerah & Elevasi</label>
+                  <input
+                    type="text"
+                    value={editOrigin}
+                    onChange={(e) => setEditOrigin(e.target.value)}
+                    placeholder="cth: Takengon, Aceh Tengah (1.550 mdpl)"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">Batas Minimum Peringatan (kg)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editMinAlert}
-                  onChange={(e) => setEditMinAlert(Number(e.target.value))}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono focus:border-emerald-600 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">Kadar Air Rata-rata (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={editMoisture}
-                  onChange={(e) => setEditMoisture(Number(e.target.value))}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono focus:border-emerald-600 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">Lokasi Penyimpanan (Silo / Palet)</label>
+              {/* VARIETAS KOPI (BEBAS KETIK SENDIRI) */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                  <label className="block font-bold text-emerald-950 text-xs">
+                    Nama Varietas (Bisa Ketik Sendiri Bebas)
+                  </label>
+                  <span className="text-[10px] text-emerald-700">Ketik bebas atau pilih di bawah</span>
+                </div>
                 <input
                   type="text"
-                  value={editStorageLoc}
-                  onChange={(e) => setEditStorageLoc(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  required
+                  list="edit-variety-datalist"
+                  value={editVariety}
+                  onChange={(e) => setEditVariety(e.target.value)}
+                  placeholder="Ketik nama varietas cth: Timtim, Ateng Super, Bourbon, Typica, dll..."
+                  className="w-full rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-medium text-xs text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
                 />
+                <datalist id="edit-variety-datalist">
+                  {COMMON_COFFEE_VARIETIES.map((v) => (
+                    <option key={v} value={v} />
+                  ))}
+                  <option value="Timtim & Ateng Super" />
+                  <option value="Bourbon & P-88" />
+                  <option value="Typica & S-795" />
+                  <option value="Sigarar Utang Multi-Variety" />
+                </datalist>
+
+                {/* Quick variety pills */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {['Timtim', 'Ateng Super', 'Bourbon', 'Typica', 'Catimor', 'Sigarar Utang', 'Longberry Gayo', 'Gayo 1', 'Abisinia'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setEditVariety(v)}
+                      className={`rounded-md px-2 py-0.5 text-[11px] font-medium border transition-colors ${
+                        editVariety === v
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:border-emerald-400 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* PROSES PASCAPANEN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Proses Pascapanen</label>
+                  <select
+                    value={isCustomEditProcess ? '__custom__' : editProcess}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomEditProcess(true);
+                      } else {
+                        setIsCustomEditProcess(false);
+                        setEditProcess(e.target.value);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-medium focus:border-emerald-600 focus:outline-hidden"
+                  >
+                    <option value="Semi Wash">Semi Wash (Giling Basah Gayo)</option>
+                    <option value="Wet Hulled">Wet Hulled</option>
+                    <option value="Full Wash">Full Wash (Fully Washed)</option>
+                    <option value="Washed">Washed</option>
+                    <option value="Natural">Natural / Dry</option>
+                    <option value="Honey">Honey</option>
+                    <option value="Anaerobic">Anaerobic</option>
+                    <option value="Anaerobic Natural">Anaerobic Natural</option>
+                    <option value="Anaerobic Washed">Anaerobic Washed</option>
+                    <option value="Anaerobic Slow Dry">Anaerobic Slow Dry (ASD)</option>
+                    <option value="Wine Process">Wine Process</option>
+                    <option value="Carbonic Maceration">Carbonic Maceration</option>
+                    <option value="__custom__">-- Tulis Proses Kustom Lainnya --</option>
+                  </select>
+
+                  {isCustomEditProcess && (
+                    <input
+                      type="text"
+                      autoFocus
+                      required
+                      value={editProcess}
+                      onChange={(e) => setEditProcess(e.target.value)}
+                      placeholder="Ketik nama proses khusus..."
+                      className="mt-1.5 w-full rounded-lg border border-amber-400 bg-amber-50/50 px-2.5 py-1 text-xs text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                    />
+                  )}
+
+                  {/* Quick process pills */}
+                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                    {['Semi Wash', 'Anaerobic', 'Anaerobic Natural', 'Full Wash', 'Natural', 'Honey', 'Wine Process'].map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setIsCustomEditProcess(false);
+                          setEditProcess(p);
+                        }}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium border ${
+                          editProcess === p && !isCustomEditProcess
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Grade / Mutu</label>
+                  <select
+                    value={editGrade}
+                    onChange={(e) => setEditGrade(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-medium focus:border-emerald-600 focus:outline-hidden"
+                  >
+                    <option value="Specialty">Specialty (Mutu Terbaik)</option>
+                    <option value="Grade 1">Grade 1</option>
+                    <option value="Micro-lot">Micro-lot</option>
+                    <option value="Commercial">Commercial</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Stok Fisik, Batas Minimal, MC, dan Lokasi Silo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-zinc-100">
+                <div>
+                  <label className="block font-bold text-zinc-800 mb-1">Stok Fisik Green Beans (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editGreenStock}
+                    onChange={(e) => setEditGreenStock(Number(e.target.value))}
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 font-mono font-bold text-sm text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-zinc-800 mb-1">Batas Minimum Peringatan (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editMinAlert}
+                    onChange={(e) => setEditMinAlert(Number(e.target.value))}
+                    className="w-full rounded-xl border border-zinc-300 px-3 py-2 font-mono text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Kadar Air Rata-rata (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editMoisture}
+                    onChange={(e) => setEditMoisture(Number(e.target.value))}
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono focus:border-emerald-600 focus:outline-hidden"
+                  />
+                  <span className="text-[10px] text-zinc-500 mt-0.5 block">Ideal SCA: 10 - 12%</span>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">Lokasi Penyimpanan (Silo / Palet)</label>
+                  <input
+                    type="text"
+                    value={editStorageLoc}
+                    onChange={(e) => setEditStorageLoc(e.target.value)}
+                    placeholder="cth: Silo A - Bay 1 Takengon"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200">
@@ -1314,7 +1662,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   type="submit"
                   className="rounded-xl bg-emerald-700 px-5 py-2 font-bold text-white hover:bg-emerald-800"
                 >
-                  Simpan Hasil Opname
+                  Simpan Perubahan & Opname
                 </button>
               </div>
             </form>

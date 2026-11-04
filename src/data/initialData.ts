@@ -202,6 +202,44 @@ export const SAMPLE_BEANS: CoffeeBean[] = [
     notes: 'Sweet orange marmalade, dark chocolate finish.',
     updatedAt: new Date().toISOString(),
     createdAt: new Date().toISOString()
+  },
+  {
+    id: 'bean-gayo-semiwash-04',
+    name: 'Gayo Bener Meriah Semi Wash',
+    origin: 'Timang Gajah, Bener Meriah (1.500 mdpl)',
+    variety: 'Timtim & Ateng Super',
+    process: 'Semi Wash',
+    grade: 'Specialty',
+    stockGreenKg: 1400,
+    stockRoastedKg: 90,
+    minAlertKg: 400,
+    priceLocalPerKg: 148000,
+    priceUmkmPerKg: 136000,
+    priceLuarPulauPerKg: 168000,
+    storageLocation: 'Silo B - Bay 1',
+    moistureAvgPercent: 11.4,
+    notes: 'Ciri khas giling basah Gayo: earthy herbal, dark cocoa, low acidity, heavy syrupy body.',
+    updatedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'bean-gayo-anaerobic-05',
+    name: 'Aceh Gayo Pegasing Anaerobic Natural',
+    origin: 'Pegasing, Aceh Tengah (1.600 mdpl)',
+    variety: 'Sigarar Utang & Bourbon',
+    process: 'Anaerobic Natural',
+    grade: 'Specialty',
+    stockGreenKg: 850,
+    stockRoastedKg: 45,
+    minAlertKg: 250,
+    priceLocalPerKg: 175000,
+    priceUmkmPerKg: 160000,
+    priceLuarPulauPerKg: 195000,
+    storageLocation: 'Silo C - Cold Storage',
+    moistureAvgPercent: 10.9,
+    notes: 'Fermentasi anaerobik 72 jam: aroma winey pekat, ripe strawberry, blackcurrant, intense sweetness.',
+    updatedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString()
   }
 ];
 

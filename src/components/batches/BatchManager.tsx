@@ -15,7 +15,14 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
-import { Batch, CoffeeBean, BatchStatus, CoffeeProcess } from '../../types/erp';
+import {
+  Batch,
+  CoffeeBean,
+  BatchStatus,
+  CoffeeProcess,
+  COMMON_COFFEE_PROCESSES,
+  COMMON_COFFEE_VARIETIES
+} from '../../types/erp';
 import { saveBatch, updateBatchStatus } from '../../services/dbService';
 
 interface BatchManagerProps {
@@ -39,6 +46,10 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
   // New Lot form
   const [selectedBeanId, setSelectedBeanId] = useState<string>(beans[0]?.id || '');
   const [lotNumber, setLotNumber] = useState<string>(`LOT-${new Date().getFullYear()}-NEW-${Math.floor(100 + Math.random() * 900)}`);
+  const [lotVariety, setLotVariety] = useState<string>(beans[0]?.variety || 'Timtim & Ateng Super');
+  const [lotProcess, setLotProcess] = useState<string>(beans[0]?.process || 'Semi Wash');
+  const [isCustomLotProcess, setIsCustomLotProcess] = useState(false);
+  const [customLotProcessInput, setCustomLotProcessInput] = useState('');
   const [bagCount, setBagCount] = useState<number>(20);
   const [bagWeightKg, setBagWeightKg] = useState<number>(60);
   const [supplierOrFarmer, setSupplierOrFarmer] = useState<string>('');
@@ -63,6 +74,11 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
     const bean = beans.find((b) => b.id === selectedBeanId);
     if (!bean) return;
 
+    const finalProcess =
+      isCustomLotProcess && customLotProcessInput.trim()
+        ? customLotProcessInput.trim()
+        : lotProcess || bean.process;
+
     const totalKg = bagCount * bagWeightKg;
     const newLot: Batch = {
       id: `batch-${Date.now().toString(36)}`,
@@ -70,7 +86,7 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
       beanId: bean.id,
       beanName: bean.name,
       origin: bean.origin,
-      process: bean.process,
+      process: finalProcess,
       quantityInitialKg: totalKg,
       quantityRemainingKg: totalKg,
       bagCount,
@@ -82,7 +98,7 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
       densityGramsPerLiter: Number(densityGramsPerLiter),
       warehouseLocation,
       status: 'In Stock',
-      qrCodeData: `LOT:${lotNumber}|BEAN:${bean.name}|KG:${totalKg}|MC:${moistureContent}%`,
+      qrCodeData: `LOT:${lotNumber}|BEAN:${bean.name}|VAR:${lotVariety || bean.variety}|PROC:${finalProcess}|KG:${totalKg}|MC:${moistureContent}%`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -413,15 +429,140 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                 <label className="block font-semibold text-zinc-700 mb-1">Pilih Master Biji Kopi</label>
                 <select
                   value={selectedBeanId}
-                  onChange={(e) => setSelectedBeanId(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-amber-500 focus:outline-hidden"
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedBeanId(id);
+                    const b = beans.find((item) => item.id === id);
+                    if (b) {
+                      setLotVariety(b.variety);
+                      setLotProcess(b.process);
+                      setIsCustomLotProcess(!COMMON_COFFEE_PROCESSES.includes(b.process as any));
+                      if (!COMMON_COFFEE_PROCESSES.includes(b.process as any)) {
+                        setCustomLotProcessInput(b.process);
+                      }
+                    }
+                  }}
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-xs focus:border-amber-500 focus:outline-hidden font-medium"
                 >
                   {beans.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.name} ({b.process}) - Lokasi: {b.storageLocation}
+                      {b.name} ({b.variety} • {b.process}) - Lokasi: {b.storageLocation}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Input Varietas (Bebas Ketik Sendiri) */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                  <label className="block font-bold text-amber-950 text-xs">
+                    Nama Varietas Biji Kopi (Bisa Isi / Ketik Bebas)
+                  </label>
+                  <span className="text-[10px] text-amber-800">Ketik bebas varietas spesifik lot ini</span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  list="batch-variety-datalist"
+                  value={lotVariety}
+                  onChange={(e) => setLotVariety(e.target.value)}
+                  placeholder="Ketik nama varietas cth: Timtim, Ateng Super, Bourbon, Typica, dll..."
+                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-medium text-xs text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                />
+                <datalist id="batch-variety-datalist">
+                  {COMMON_COFFEE_VARIETIES.map((v) => (
+                    <option key={v} value={v} />
+                  ))}
+                  <option value="Timtim & Ateng Super" />
+                  <option value="Bourbon & P-88" />
+                  <option value="Typica & S-795" />
+                  <option value="Sigarar Utang Multi-Variety" />
+                </datalist>
+
+                {/* Quick variety pills */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] font-semibold text-amber-900">Rekomendasi:</span>
+                  {['Timtim', 'Ateng Super', 'Bourbon', 'Typica', 'Catimor', 'Sigarar Utang', 'Longberry Gayo', 'Gayo 1'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setLotVariety(v)}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors ${
+                        lotVariety === v
+                          ? 'bg-amber-800 text-white border-amber-800'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:border-amber-400 hover:bg-amber-50'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input Proses Pascapanen Lot */}
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">
+                  Proses Pascapanen Lot Ini
+                </label>
+                <select
+                  value={isCustomLotProcess ? '__custom__' : lotProcess}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setIsCustomLotProcess(true);
+                    } else {
+                      setIsCustomLotProcess(false);
+                      setLotProcess(e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden font-medium"
+                >
+                  <option value="Semi Wash">Semi Wash (Giling Basah Gayo)</option>
+                  <option value="Wet Hulled">Wet Hulled</option>
+                  <option value="Full Wash">Full Wash (Fully Washed)</option>
+                  <option value="Washed">Washed</option>
+                  <option value="Natural">Natural / Dry</option>
+                  <option value="Honey">Honey</option>
+                  <option value="Anaerobic">Anaerobic</option>
+                  <option value="Anaerobic Natural">Anaerobic Natural</option>
+                  <option value="Anaerobic Washed">Anaerobic Washed</option>
+                  <option value="Anaerobic Slow Dry">Anaerobic Slow Dry (ASD)</option>
+                  <option value="Wine Process">Wine Process</option>
+                  <option value="Carbonic Maceration">Carbonic Maceration</option>
+                  <option value="__custom__">-- Tulis Proses Kustom Lainnya --</option>
+                </select>
+
+                {isCustomLotProcess && (
+                  <input
+                    type="text"
+                    autoFocus
+                    required
+                    value={customLotProcessInput}
+                    onChange={(e) => setCustomLotProcessInput(e.target.value)}
+                    placeholder="Ketik nama proses khusus..."
+                    className="mt-1.5 w-full rounded-lg border border-amber-400 bg-amber-50/50 px-2.5 py-1 text-xs text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  />
+                )}
+
+                {/* Quick process pills */}
+                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                  {['Semi Wash', 'Anaerobic', 'Anaerobic Natural', 'Full Wash', 'Natural', 'Honey', 'Wine Process'].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => {
+                        setIsCustomLotProcess(false);
+                        setLotProcess(p);
+                      }}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium border ${
+                        lotProcess === p && !isCustomLotProcess
+                          ? 'bg-amber-800 text-white border-amber-800'
+                          : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
