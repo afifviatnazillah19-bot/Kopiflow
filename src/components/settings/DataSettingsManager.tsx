@@ -48,9 +48,11 @@ import {
   setLocalCache,
   getWarehouseHeads,
   saveWarehouseHeads,
+  deleteWarehouseHead,
   subscribeToWarehouseHeads,
   getRoasterStaff,
   saveRoasterStaff,
+  deleteRoasterStaff,
   subscribeToRoasterStaff
 } from '../../services/dbService';
 import { DEFAULT_ROASTER_STAFF, DEFAULT_WAREHOUSE_HEAD } from '../../data/initialData';
@@ -132,16 +134,14 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
   const handleDeleteRoaster = async (id: string) => {
     const target = roasters.find((r) => r.id === id);
     if (!target) return;
-    const updated = roasters.filter((r) => r.id !== id);
-    await saveRoastersToDatabase(updated);
+    await deleteRoasterStaff(id);
     showNotification(`Roaster "${target.name}" berhasil dihapus dari database Firestore.`);
   };
 
   const handleDeleteWhHead = async (id: string) => {
     const target = warehouseHeadList.find((w) => w.id === id);
     if (!target) return;
-    const updated = warehouseHeadList.filter((w) => w.id !== id);
-    await saveWhHeadToDatabase(updated);
+    await deleteWarehouseHead(id);
     showNotification(`Kepala Gudang "${target.name}" berhasil dihapus dari database Firestore.`);
   };
 

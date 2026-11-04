@@ -54,7 +54,9 @@ import {
   subscribeToNotifications,
   subscribeToPartners,
   subscribeToInbound,
-  subscribeToOutbound
+  subscribeToOutbound,
+  subscribeToRoasterStaff,
+  subscribeToWarehouseHeads
 } from './services/dbService';
 import { testFirestoreConnection } from './firebase/config';
 
@@ -94,6 +96,8 @@ export default function App() {
       const unsubPartners = subscribeToPartners(setPartners, NEUTRAL_EMPTY_PARTNERS);
       const unsubInb = subscribeToInbound(setInbound, NEUTRAL_EMPTY_INBOUND);
       const unsubOut = subscribeToOutbound(setOutbound, NEUTRAL_EMPTY_OUTBOUND);
+      const unsubRst = subscribeToRoasterStaff(() => {});
+      const unsubWh = subscribeToWarehouseHeads(() => {});
 
       unsubs = [
         unsubBeans,
@@ -104,7 +108,9 @@ export default function App() {
         unsubNotifs,
         unsubPartners,
         unsubInb,
-        unsubOut
+        unsubOut,
+        unsubRst,
+        unsubWh
       ];
       setIsSyncing(false);
     };

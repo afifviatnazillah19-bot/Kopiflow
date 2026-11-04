@@ -56,6 +56,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Staf Roaster & Operator
+    match /roaster_staff/{staffId} {
+      allow read, write: if true;
+    }
+
+    // Kepala Gudang & Manager
+    match /warehouse_heads/{headId} {
+      allow read, write: if true;
+    }
+
     // Default deny for unlisted documents
     match /{document=**} {
       allow read, write: if false;

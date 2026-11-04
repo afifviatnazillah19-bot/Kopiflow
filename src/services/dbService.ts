@@ -49,7 +49,9 @@ export const COLLECTIONS = {
   PARTNERS: 'partners',
   INBOUND: 'inbound_movements',
   OUTBOUND: 'outbound_movements',
-  SETTINGS: 'system_settings'
+  SETTINGS: 'system_settings',
+  ROASTER_STAFF: 'roaster_staff',
+  WAREHOUSE_HEADS: 'warehouse_heads'
 } as const;
 
 // Local Reactive Store & Cache Helpers
@@ -1127,6 +1129,9 @@ export function subscribeToQrisConfig(
 // -------------------------------------------------------------
 // MANAJEMEN DATA STAF ROASTER & KEPALA GUDANG (FIRESTORE SYNC)
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// MANAJEMEN DATA STAF ROASTER & KEPALA GUDANG (FIRESTORE SYNC)
+// -------------------------------------------------------------
 export function getWarehouseHeads(): WarehouseHead[] {
   return getLocalCache<WarehouseHead[]>('warehouse_head', DEFAULT_WAREHOUSE_HEAD);
 }
@@ -1135,14 +1140,35 @@ export async function saveWarehouseHeads(heads: WarehouseHead[]): Promise<void> 
   setLocalCache('warehouse_head', heads);
 
   try {
-    const payload = {
+    // 1. Sync collection document for each item
+    for (const head of heads) {
+      const payload = removeUndefined({ ...head });
+      await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.WAREHOUSE_HEADS, head.id), payload));
+      await syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, head.id, payload);
+    }
+    // 2. Sync setting container document
+    const listPayload = {
       list: removeUndefined(heads),
       updatedAt: new Date().toISOString()
     };
-    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), payload));
-    await syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', payload);
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), listPayload));
+    await syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', listPayload);
   } catch (error) {
     console.warn('Notice saving warehouse heads to Firestore:', error);
+  }
+}
+
+export async function deleteWarehouseHead(headId: string): Promise<void> {
+  const current = getWarehouseHeads();
+  const updated = current.filter((w) => w.id !== headId);
+  setLocalCache('warehouse_head', updated);
+
+  try {
+    await safeFirestoreWrite(deleteDoc(doc(db, COLLECTIONS.WAREHOUSE_HEADS, headId)));
+    await syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, headId, null);
+    await saveWarehouseHeads(updated);
+  } catch (error) {
+    console.warn('Notice deleting warehouse head from Firestore:', error);
   }
 }
 
@@ -1158,16 +1184,26 @@ export function subscribeToWarehouseHeads(
 
   let firestoreUnsub: (() => void) | null = null;
   try {
+    // Listen directly on warehouse_heads collection
     firestoreUnsub = onSnapshot(
-      doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'),
+      collection(db, COLLECTIONS.WAREHOUSE_HEADS),
       (snapshot) => {
-        if (snapshot.exists()) {
-          const raw = snapshot.data();
-          const list = (raw.list || raw) as WarehouseHead[];
-          if (Array.isArray(list) && list.length > 0) {
-            setLocalCache('warehouse_head', list);
-            callback(list);
-          }
+        if (!snapshot.empty) {
+          const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as WarehouseHead));
+          setLocalCache('warehouse_head', items);
+          callback(items);
+        } else {
+          // Secondary fallback check on system_settings/warehouse_heads
+          getDocs(collection(db, COLLECTIONS.SETTINGS)).then((settingsSnap) => {
+            const docData = settingsSnap.docs.find((d) => d.id === 'warehouse_heads')?.data();
+            if (docData && Array.isArray(docData.list) && docData.list.length > 0) {
+              setLocalCache('warehouse_head', docData.list);
+              callback(docData.list);
+            } else {
+              // Auto-seed default warehouse heads into Firestore
+              saveWarehouseHeads(DEFAULT_WAREHOUSE_HEAD);
+            }
+          }).catch(() => {});
         }
       },
       (error) => {
@@ -1193,14 +1229,35 @@ export async function saveRoasterStaff(staff: RoasterStaff[]): Promise<void> {
   setLocalCache('roaster_staff', staff);
 
   try {
-    const payload = {
+    // 1. Sync collection document for each item
+    for (const item of staff) {
+      const payload = removeUndefined({ ...item });
+      await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.ROASTER_STAFF, item.id), payload));
+      await syncToRTDB(COLLECTIONS.ROASTER_STAFF, item.id, payload);
+    }
+    // 2. Sync setting container document
+    const listPayload = {
       list: removeUndefined(staff),
       updatedAt: new Date().toISOString()
     };
-    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), payload));
-    await syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', payload);
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), listPayload));
+    await syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', listPayload);
   } catch (error) {
     console.warn('Notice saving roaster staff to Firestore:', error);
+  }
+}
+
+export async function deleteRoasterStaff(staffId: string): Promise<void> {
+  const current = getRoasterStaff();
+  const updated = current.filter((r) => r.id !== staffId);
+  setLocalCache('roaster_staff', updated);
+
+  try {
+    await safeFirestoreWrite(deleteDoc(doc(db, COLLECTIONS.ROASTER_STAFF, staffId)));
+    await syncToRTDB(COLLECTIONS.ROASTER_STAFF, staffId, null);
+    await saveRoasterStaff(updated);
+  } catch (error) {
+    console.warn('Notice deleting roaster staff from Firestore:', error);
   }
 }
 
@@ -1216,16 +1273,26 @@ export function subscribeToRoasterStaff(
 
   let firestoreUnsub: (() => void) | null = null;
   try {
+    // Listen directly on roaster_staff collection
     firestoreUnsub = onSnapshot(
-      doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'),
+      collection(db, COLLECTIONS.ROASTER_STAFF),
       (snapshot) => {
-        if (snapshot.exists()) {
-          const raw = snapshot.data();
-          const list = (raw.list || raw) as RoasterStaff[];
-          if (Array.isArray(list) && list.length > 0) {
-            setLocalCache('roaster_staff', list);
-            callback(list);
-          }
+        if (!snapshot.empty) {
+          const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as RoasterStaff));
+          setLocalCache('roaster_staff', items);
+          callback(items);
+        } else {
+          // Secondary fallback check on system_settings/roaster_staff
+          getDocs(collection(db, COLLECTIONS.SETTINGS)).then((settingsSnap) => {
+            const docData = settingsSnap.docs.find((d) => d.id === 'roaster_staff')?.data();
+            if (docData && Array.isArray(docData.list) && docData.list.length > 0) {
+              setLocalCache('roaster_staff', docData.list);
+              callback(docData.list);
+            } else {
+              // Auto-seed default roaster staff into Firestore
+              saveRoasterStaff(DEFAULT_ROASTER_STAFF);
+            }
+          }).catch(() => {});
         }
       },
       (error) => {
