@@ -48,10 +48,12 @@ import {
   setLocalCache,
   getWarehouseHeads,
   saveWarehouseHeads,
+  saveSingleWarehouseHead,
   deleteWarehouseHead,
   subscribeToWarehouseHeads,
   getRoasterStaff,
   saveRoasterStaff,
+  saveSingleRoasterStaff,
   deleteRoasterStaff,
   subscribeToRoasterStaff
 } from '../../services/dbService';
@@ -158,21 +160,17 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
   const handleSaveRoaster = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRoaster) {
-      const updated = roasters.map((item: RoasterStaff) =>
-        item.id === editingRoaster.id
-          ? {
-              ...item,
-              name: rName,
-              phone: rPhone,
-              role: rRole,
-              certification: rCert,
-              machineSpecialty: rMachine,
-              shift: rShift,
-              status: rStatus
-            }
-          : item
-      );
-      await saveRoastersToDatabase(updated);
+      const updatedItem: RoasterStaff = {
+        ...editingRoaster,
+        name: rName,
+        phone: rPhone,
+        role: rRole,
+        certification: rCert,
+        machineSpecialty: rMachine,
+        shift: rShift,
+        status: rStatus
+      };
+      await saveSingleRoasterStaff(updatedItem);
       showNotification(`Data Roaster "${rName}" tersimpan di database Firestore.`);
     } else {
       const newRoaster: RoasterStaff = {
@@ -186,7 +184,7 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
         status: rStatus,
         createdAt: new Date().toISOString()
       };
-      await saveRoastersToDatabase([...roasters, newRoaster]);
+      await saveSingleRoasterStaff(newRoaster);
       showNotification(`Roaster baru "${rName}" berhasil tersimpan ke database.`);
     }
     setIsRoasterModalOpen(false);
@@ -200,20 +198,16 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
       .filter(Boolean);
 
     if (editingWhHead) {
-      const updated = warehouseHeadList.map((item: WarehouseHead) =>
-        item.id === editingWhHead.id
-          ? {
-              ...item,
-              name: whName,
-              phone: whPhone,
-              nikStaff: whNik,
-              hubLocation: whHub,
-              shift: whShift,
-              responsibilities: respArr
-            }
-          : item
-      );
-      await saveWhHeadToDatabase(updated);
+      const updatedHead: WarehouseHead = {
+        ...editingWhHead,
+        name: whName,
+        phone: whPhone,
+        nikStaff: whNik,
+        hubLocation: whHub,
+        shift: whShift,
+        responsibilities: respArr
+      };
+      await saveSingleWarehouseHead(updatedHead);
       showNotification(`Data Kepala Gudang "${whName}" tersimpan di database Firestore.`);
     } else {
       const newHead: WarehouseHead = {
@@ -227,7 +221,7 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
         status: warehouseHeadList.length === 0 ? 'Primary' : 'Active',
         createdAt: new Date().toISOString()
       };
-      await saveWhHeadToDatabase([...warehouseHeadList, newHead]);
+      await saveSingleWarehouseHead(newHead);
       showNotification(`Kepala Gudang baru "${whName}" berhasil disimpan ke database.`);
     }
     setIsWhHeadModalOpen(false);

@@ -1136,23 +1136,49 @@ export function getWarehouseHeads(): WarehouseHead[] {
   return getLocalCache<WarehouseHead[]>('warehouse_head', DEFAULT_WAREHOUSE_HEAD);
 }
 
+export async function saveSingleWarehouseHead(head: WarehouseHead): Promise<void> {
+  const current = getWarehouseHeads();
+  const idx = current.findIndex((w) => w.id === head.id);
+  const updated = idx >= 0 ? current.map((w) => (w.id === head.id ? head : w)) : [...current, head];
+  setLocalCache('warehouse_head', updated);
+
+  try {
+    const batch = writeBatch(db);
+    const payload = removeUndefined({ ...head });
+    batch.set(doc(db, COLLECTIONS.WAREHOUSE_HEADS, head.id), payload);
+
+    const listPayload = {
+      list: removeUndefined(updated),
+      updatedAt: new Date().toISOString()
+    };
+    batch.set(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), listPayload);
+
+    await safeFirestoreWrite(batch.commit());
+    syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, head.id, payload);
+    syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', listPayload);
+  } catch (error) {
+    console.warn('Notice saving single warehouse head to Firestore:', error);
+  }
+}
+
 export async function saveWarehouseHeads(heads: WarehouseHead[]): Promise<void> {
   setLocalCache('warehouse_head', heads);
 
   try {
-    // 1. Sync collection document for each item
+    const batch = writeBatch(db);
     for (const head of heads) {
       const payload = removeUndefined({ ...head });
-      await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.WAREHOUSE_HEADS, head.id), payload));
-      await syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, head.id, payload);
+      batch.set(doc(db, COLLECTIONS.WAREHOUSE_HEADS, head.id), payload);
+      syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, head.id, payload);
     }
-    // 2. Sync setting container document
     const listPayload = {
       list: removeUndefined(heads),
       updatedAt: new Date().toISOString()
     };
-    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), listPayload));
-    await syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', listPayload);
+    batch.set(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), listPayload);
+    syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', listPayload);
+
+    await safeFirestoreWrite(batch.commit());
   } catch (error) {
     console.warn('Notice saving warehouse heads to Firestore:', error);
   }
@@ -1164,9 +1190,17 @@ export async function deleteWarehouseHead(headId: string): Promise<void> {
   setLocalCache('warehouse_head', updated);
 
   try {
-    await safeFirestoreWrite(deleteDoc(doc(db, COLLECTIONS.WAREHOUSE_HEADS, headId)));
-    await syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, headId, null);
-    await saveWarehouseHeads(updated);
+    const batch = writeBatch(db);
+    batch.delete(doc(db, COLLECTIONS.WAREHOUSE_HEADS, headId));
+    const listPayload = {
+      list: removeUndefined(updated),
+      updatedAt: new Date().toISOString()
+    };
+    batch.set(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), listPayload);
+
+    await safeFirestoreWrite(batch.commit());
+    syncToRTDB(COLLECTIONS.WAREHOUSE_HEADS, headId, null);
+    syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', listPayload);
   } catch (error) {
     console.warn('Notice deleting warehouse head from Firestore:', error);
   }
@@ -1225,23 +1259,49 @@ export function getRoasterStaff(): RoasterStaff[] {
   return getLocalCache<RoasterStaff[]>('roaster_staff', DEFAULT_ROASTER_STAFF);
 }
 
+export async function saveSingleRoasterStaff(staffItem: RoasterStaff): Promise<void> {
+  const current = getRoasterStaff();
+  const idx = current.findIndex((r) => r.id === staffItem.id);
+  const updated = idx >= 0 ? current.map((r) => (r.id === staffItem.id ? staffItem : r)) : [...current, staffItem];
+  setLocalCache('roaster_staff', updated);
+
+  try {
+    const batch = writeBatch(db);
+    const payload = removeUndefined({ ...staffItem });
+    batch.set(doc(db, COLLECTIONS.ROASTER_STAFF, staffItem.id), payload);
+
+    const listPayload = {
+      list: removeUndefined(updated),
+      updatedAt: new Date().toISOString()
+    };
+    batch.set(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), listPayload);
+
+    await safeFirestoreWrite(batch.commit());
+    syncToRTDB(COLLECTIONS.ROASTER_STAFF, staffItem.id, payload);
+    syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', listPayload);
+  } catch (error) {
+    console.warn('Notice saving single roaster staff to Firestore:', error);
+  }
+}
+
 export async function saveRoasterStaff(staff: RoasterStaff[]): Promise<void> {
   setLocalCache('roaster_staff', staff);
 
   try {
-    // 1. Sync collection document for each item
+    const batch = writeBatch(db);
     for (const item of staff) {
       const payload = removeUndefined({ ...item });
-      await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.ROASTER_STAFF, item.id), payload));
-      await syncToRTDB(COLLECTIONS.ROASTER_STAFF, item.id, payload);
+      batch.set(doc(db, COLLECTIONS.ROASTER_STAFF, item.id), payload);
+      syncToRTDB(COLLECTIONS.ROASTER_STAFF, item.id, payload);
     }
-    // 2. Sync setting container document
     const listPayload = {
       list: removeUndefined(staff),
       updatedAt: new Date().toISOString()
     };
-    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), listPayload));
-    await syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', listPayload);
+    batch.set(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), listPayload);
+    syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', listPayload);
+
+    await safeFirestoreWrite(batch.commit());
   } catch (error) {
     console.warn('Notice saving roaster staff to Firestore:', error);
   }
@@ -1253,9 +1313,17 @@ export async function deleteRoasterStaff(staffId: string): Promise<void> {
   setLocalCache('roaster_staff', updated);
 
   try {
-    await safeFirestoreWrite(deleteDoc(doc(db, COLLECTIONS.ROASTER_STAFF, staffId)));
-    await syncToRTDB(COLLECTIONS.ROASTER_STAFF, staffId, null);
-    await saveRoasterStaff(updated);
+    const batch = writeBatch(db);
+    batch.delete(doc(db, COLLECTIONS.ROASTER_STAFF, staffId));
+    const listPayload = {
+      list: removeUndefined(updated),
+      updatedAt: new Date().toISOString()
+    };
+    batch.set(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), listPayload);
+
+    await safeFirestoreWrite(batch.commit());
+    syncToRTDB(COLLECTIONS.ROASTER_STAFF, staffId, null);
+    syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', listPayload);
   } catch (error) {
     console.warn('Notice deleting roaster staff from Firestore:', error);
   }
