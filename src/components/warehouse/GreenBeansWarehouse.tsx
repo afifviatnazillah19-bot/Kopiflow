@@ -34,6 +34,7 @@ import {
   Partner,
   BusinessNotificationConfig,
   CoffeeProcess,
+  WarehouseHead,
   COMMON_COFFEE_PROCESSES,
   COMMON_COFFEE_VARIETIES
 } from '../../types/erp';
@@ -48,7 +49,9 @@ import {
   buildLowStockAlertMessage,
   buildSingleBeanLowStockMessage,
   saveNotificationLog,
-  dispatchWhatsAppNotification
+  dispatchWhatsAppNotification,
+  getWarehouseHeads,
+  subscribeToWarehouseHeads
 } from '../../services/dbService';
 
 interface GreenBeansWarehouseProps {
@@ -148,11 +151,20 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [alertDispatchModalBean, setAlertDispatchModalBean] = useState<CoffeeBean | null>(null);
 
 
+  // Real-time Firestore Warehouse Head List
+  const [warehouseHeadList, setWarehouseHeadList] = useState<WarehouseHead[]>(getWarehouseHeads);
+
   useEffect(() => {
+    const unsubWh = subscribeToWarehouseHeads((heads) => {
+      setWarehouseHeadList(heads);
+    });
     const unsub = subscribeToNotificationConfig((cfg) => {
       if (cfg) setNotifConfig(cfg);
     });
-    return () => unsub();
+    return () => {
+      unsubWh();
+      unsub();
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -1414,13 +1426,50 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Nama Petugas Penerima</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-zinc-700">Nama Petugas Penerima / Kepala Gudang</label>
+                    <span className="text-[10px] font-semibold text-emerald-700">Firestore DB Sync</span>
+                  </div>
                   <input
                     type="text"
+                    required
+                    list="warehouse-head-datalist"
                     value={inboundReceiver}
                     onChange={(e) => setInboundReceiver(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 sm:py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
+                    placeholder="Pilih atau ketik nama petugas penerima..."
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 sm:py-2 text-xs focus:border-emerald-600 focus:outline-hidden font-medium text-zinc-900"
                   />
+                  <datalist id="warehouse-head-datalist">
+                    {warehouseHeadList.map((wh) => (
+                      <option key={wh.id} value={`${wh.name} (${wh.hubLocation})`}>
+                        {wh.name} - {wh.nikStaff} ({wh.hubLocation})
+                      </option>
+                    ))}
+                  </datalist>
+
+                  {/* Quick pills from Database */}
+                  {warehouseHeadList.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      <span className="text-[10px] font-semibold text-zinc-500">Pilih Petugas:</span>
+                      {warehouseHeadList.map((wh) => {
+                        const valStr = `${wh.name} (${wh.hubLocation})`;
+                        return (
+                          <button
+                            key={wh.id}
+                            type="button"
+                            onClick={() => setInboundReceiver(valStr)}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors ${
+                              inboundReceiver === valStr || inboundReceiver === wh.name
+                                ? 'bg-emerald-700 text-white border-emerald-700'
+                                : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200'
+                            }`}
+                          >
+                            {wh.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

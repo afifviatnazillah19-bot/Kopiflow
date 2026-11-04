@@ -19,9 +19,9 @@ import {
   SlidersHorizontal,
   Calendar
 } from 'lucide-react';
-import { RoastLog, CoffeeBean, Batch, RoastLevel, RoastStatus } from '../../types/erp';
+import { RoastLog, CoffeeBean, Batch, RoastLevel, RoastStatus, RoasterStaff } from '../../types/erp';
 import { RoastCurveChart } from './RoastCurveChart';
-import { saveRoastLog, buildWhatsAppLink } from '../../services/dbService';
+import { saveRoastLog, buildWhatsAppLink, getRoasterStaff, subscribeToRoasterStaff } from '../../services/dbService';
 
 interface RoastLabProps {
   roasts: RoastLog[];
@@ -45,6 +45,16 @@ export const RoastLab: React.FC<RoastLabProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [machineFilter, setMachineFilter] = useState<string>('all');
+
+  // Real-time Database Staf Roaster List
+  const [roasterStaffList, setRoasterStaffList] = useState<RoasterStaff[]>(getRoasterStaff);
+
+  React.useEffect(() => {
+    const unsub = subscribeToRoasterStaff((staff) => {
+      setRoasterStaffList(staff);
+    });
+    return () => unsub();
+  }, []);
 
   // Handle external trigger from Header
   React.useEffect(() => {
@@ -73,7 +83,10 @@ export const RoastLab: React.FC<RoastLabProps> = ({
   const [totalTimeSec, setTotalTimeSec] = useState<number | ''>(640);
   const [cuppingScore, setCuppingScore] = useState<number | ''>(87.5);
   const [cuppingNotes, setCuppingNotes] = useState<string>('Bergamot, orange blossom, brown sugar sweetness, crisp malic acidity');
-  const [roasterOperator, setRoasterOperator] = useState<string>('Hendra Setiawan (Head Roaster)');
+  const [roasterOperator, setRoasterOperator] = useState<string>(() => {
+    const defaultStaff = getRoasterStaff();
+    return defaultStaff[0]?.name ? `${defaultStaff[0].name} (${defaultStaff[0].role})` : 'Hendra Setiawan (Head Roaster)';
+  });
   const [roastDate, setRoastDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [roastStatus, setRoastStatus] = useState<RoastStatus>('Passed QC');
 
@@ -781,13 +794,50 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">Roaster Operator</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-zinc-700">Roaster Operator / Petugas</label>
+                    <span className="text-[10px] font-semibold text-amber-800">Firestore DB Sync</span>
+                  </div>
                   <input
                     type="text"
+                    required
+                    list="roaster-staff-datalist"
                     value={roasterOperator}
                     onChange={(e) => setRoasterOperator(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
+                    placeholder="Pilih atau ketik nama roaster..."
+                    className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden font-medium text-xs text-zinc-900"
                   />
+                  <datalist id="roaster-staff-datalist">
+                    {roasterStaffList.map((staf) => (
+                      <option key={staf.id} value={`${staf.name} (${staf.role})`}>
+                        {staf.name} - {staf.role} ({staf.shift})
+                      </option>
+                    ))}
+                  </datalist>
+
+                  {/* Quick pills from Database */}
+                  {roasterStaffList.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      <span className="text-[10px] font-semibold text-zinc-500">Pilih Staf:</span>
+                      {roasterStaffList.map((staf) => {
+                        const valStr = `${staf.name} (${staf.role})`;
+                        return (
+                          <button
+                            key={staf.id}
+                            type="button"
+                            onClick={() => setRoasterOperator(valStr)}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors ${
+                              roasterOperator === valStr || roasterOperator === staf.name
+                                ? 'bg-amber-800 text-white border-amber-800'
+                                : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200'
+                            }`}
+                          >
+                            {staf.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

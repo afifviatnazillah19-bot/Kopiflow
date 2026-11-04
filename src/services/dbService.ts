@@ -681,6 +681,27 @@ export async function saveInboundMovement(
     updateBeanStock(movement.beanId, movement.weightKg, 0, beansList);
   }
 
+  // Otomatis simpan & daftarkan nama Petugas Penerima / Kepala Gudang ke database jika belum ada
+  if (movement.receivedBy && movement.receivedBy.trim()) {
+    const recName = movement.receivedBy.trim();
+    const existingHeads = getWarehouseHeads();
+    if (!existingHeads.some((w) => w.name.toLowerCase() === recName.toLowerCase())) {
+      const newHead: WarehouseHead = {
+        id: `wh-${Date.now().toString(36)}`,
+        name: recName,
+        phone: '6281234567890',
+        nikStaff: `KFH-WH-${Math.floor(100 + Math.random() * 900)}`,
+        hubLocation: movement.warehouseLocation || 'Gudang Utama',
+        shift: 'Full Time',
+        responsibilities: ['Inbound Green Beans', 'Stok Opname'],
+        status: existingHeads.length === 0 ? 'Primary' : 'Active',
+        notes: `Otomatis ditambahkan dari Penerimaan ${movement.docNumber}`,
+        createdAt: new Date().toISOString()
+      };
+      saveWarehouseHeads([...existingHeads, newHead]);
+    }
+  }
+
   try {
     const payload = removeUndefined({ ...movement });
     await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.INBOUND, movement.id), payload));
@@ -751,6 +772,27 @@ export async function saveRoastLog(
           currentBatches.map((b) => (b.id === batch.id ? updatedBatch : b))
         );
       }
+    }
+  }
+
+  // Auto register Roaster Operator name to Firestore roaster_staff database if not existing
+  if (roastLog.roasterOperator && roastLog.roasterOperator.trim()) {
+    const opName = roastLog.roasterOperator.trim();
+    const currentRoasters = getRoasterStaff();
+    if (!currentRoasters.some((r) => r.name.toLowerCase() === opName.toLowerCase())) {
+      const newRoaster: RoasterStaff = {
+        id: `rst-${Date.now().toString(36)}`,
+        name: opName,
+        phone: '6281234567890',
+        role: 'Roaster Operator',
+        certification: 'SCA Roaster / Operator Roastery',
+        machineSpecialty: roastLog.roasterMachine || 'Mesin Roasting Rakitan',
+        shift: 'Flexi',
+        status: 'Active',
+        notes: `Otomatis ditambahkan saat mencatat sesi ${roastLog.roastNumber}`,
+        createdAt: new Date().toISOString()
+      };
+      saveRoasterStaff([...currentRoasters, newRoaster]);
     }
   }
 
