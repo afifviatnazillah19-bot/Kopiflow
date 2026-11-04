@@ -1,3 +1,4 @@
+import React, { useRef, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -16,8 +17,11 @@ import {
   Command,
   ChevronRight,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Gauge
 } from 'lucide-react';
+
+
 import { NavTab } from './Sidebar';
 
 export interface HeaderProps {
@@ -61,8 +65,21 @@ export const Header: React.FC<HeaderProps> = ({
   activeShipmentsCount = 0,
   partnersCount = 0
 }) => {
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest'
+      });
+    }
+  }, [currentTab]);
+
   // Navigation tabs definition for the modern top bar
   const navTabs = [
+
     {
       id: 'dashboard' as NavTab,
       label: 'Ringkasan',
@@ -75,6 +92,13 @@ export const Header: React.FC<HeaderProps> = ({
       icon: Wheat,
       badge: lowStockCount > 0 ? `${lowStockCount} tipis` : null,
       badgeColor: 'bg-rose-500 text-white'
+    },
+    {
+      id: 'density' as NavTab,
+      label: 'Kalkulator Densitas',
+      icon: Gauge,
+      badge: 'g/L QC',
+      badgeColor: 'bg-teal-600/20 text-teal-800'
     },
     {
       id: 'roastlab' as NavTab,
@@ -137,11 +161,17 @@ export const Header: React.FC<HeaderProps> = ({
           title: 'Gudang Green Beans (Biji Mentah)',
           subtitle: 'Penerimaan biji mentah dari pabrik/kebun, kadar air (MC), manajemen lot, dan transfer sangrai'
         };
+      case 'density':
+        return {
+          title: 'Kalkulator Densitas Kopi (QC Lab)',
+          subtitle: 'Kalkulasi g/L & kg/m³, klasifikasi sel SCA (SHB/HB/Soft), profil sangrai presisi, dan estimasi silo'
+        };
       case 'roastlab':
         return {
           title: 'Roast Lab & Profil Penyangraian Presisi',
           subtitle: 'Pencatatan kurva suhu (BT/ET/RoR), DTR %, penyusutan bobot, dan skor cupping SCA'
         };
+
       case 'roasted-beans':
         return {
           title: 'Gudang Roast Beans (Biji Matang)',
@@ -296,13 +326,15 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={tab.id}
+                ref={isActive ? activeTabRef : null}
                 onClick={() => onSelectTab(tab.id)}
-                className={`group relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all duration-150 ${
+                className={`group relative flex items-center gap-1.5 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-all duration-150 shrink-0 ${
                   isActive
                     ? 'bg-zinc-900 text-white shadow-xs ring-1 ring-zinc-800 scale-[1.02]'
                     : 'text-zinc-600 hover:text-zinc-950 hover:bg-white/80 hover:shadow-2xs'
                 }`}
               >
+
                 <Icon
                   className={`h-3.5 w-3.5 transition-colors ${
                     isActive ? 'text-amber-400' : 'text-zinc-400 group-hover:text-zinc-700'

@@ -11,8 +11,10 @@ import {
   MapPin,
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  Gauge
 } from 'lucide-react';
+
 import { CoffeeBean, Batch, RoastLog, Order, Shipment, PricingTier } from '../../types/erp';
 import { formatIDR } from '../../services/dbService';
 import { NavTab } from '../layout/Sidebar';
@@ -364,13 +366,25 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 <p className="text-xs text-zinc-500">Penyangraian presisi & evaluasi sensori SCA</p>
               </div>
             </div>
-            <button
-              onClick={onOpenNewRoastModal}
-              className="inline-flex items-center gap-1 text-xs font-bold text-orange-700 hover:text-orange-800"
-            >
-              + Sangrai Baru
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigate('density')}
+                className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2.5 py-1 rounded-lg transition-colors"
+                title="Buka Kalkulator Densitas Biji Kopi"
+              >
+                <Gauge className="h-3.5 w-3.5" />
+                <span>Ukur Densitas (g/L)</span>
+              </button>
+              <button
+                onClick={onOpenNewRoastModal}
+                className="inline-flex items-center gap-1 text-xs font-bold text-orange-700 hover:text-orange-800"
+              >
+                + Sangrai Baru
+              </button>
+            </div>
           </div>
+
 
           <div className="divide-y divide-zinc-100 mt-2">
             {recentRoasts.map((roast) => (

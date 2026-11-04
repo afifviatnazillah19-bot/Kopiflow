@@ -50,13 +50,13 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
   const [lotProcess, setLotProcess] = useState<string>(beans[0]?.process || 'Semi Wash');
   const [isCustomLotProcess, setIsCustomLotProcess] = useState(false);
   const [customLotProcessInput, setCustomLotProcessInput] = useState('');
-  const [bagCount, setBagCount] = useState<number>(20);
-  const [bagWeightKg, setBagWeightKg] = useState<number>(60);
+  const [bagCount, setBagCount] = useState<number | ''>(20);
+  const [bagWeightKg, setBagWeightKg] = useState<number | ''>(60);
   const [supplierOrFarmer, setSupplierOrFarmer] = useState<string>('');
   const [harvestDate, setHarvestDate] = useState<string>('2026-05-15');
   const [receivedDate, setReceivedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [moistureContent, setMoistureContent] = useState<number>(11.2);
-  const [densityGramsPerLiter, setDensityGramsPerLiter] = useState<number>(710);
+  const [moistureContent, setMoistureContent] = useState<number | ''>(11.2);
+  const [densityGramsPerLiter, setDensityGramsPerLiter] = useState<number | ''>(710);
   const [warehouseLocation, setWarehouseLocation] = useState<string>('Silo A - Bay 2');
 
   const filteredBatches = batches.filter((b) => {
@@ -79,7 +79,9 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
         ? customLotProcessInput.trim()
         : lotProcess || bean.process;
 
-    const totalKg = bagCount * bagWeightKg;
+    const numericBagCount = Number(bagCount) || 0;
+    const numericBagWeightKg = Number(bagWeightKg) || 0;
+    const totalKg = numericBagCount * numericBagWeightKg;
     const newLot: Batch = {
       id: `batch-${Date.now().toString(36)}`,
       lotNumber,
@@ -89,13 +91,13 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
       process: finalProcess,
       quantityInitialKg: totalKg,
       quantityRemainingKg: totalKg,
-      bagCount,
-      bagWeightKg,
+      bagCount: numericBagCount,
+      bagWeightKg: numericBagWeightKg,
       supplierOrFarmer: supplierOrFarmer || 'Koperasi Petani Mitra KopiFlow',
       harvestDate,
       receivedDate: receivedDate || new Date().toISOString().split('T')[0],
-      moistureContent: Number(moistureContent),
-      densityGramsPerLiter: Number(densityGramsPerLiter),
+      moistureContent: Number(moistureContent) || 0,
+      densityGramsPerLiter: Number(densityGramsPerLiter) || 0,
       warehouseLocation,
       status: 'In Stock',
       qrCodeData: `LOT:${lotNumber}|BEAN:${bean.name}|VAR:${lotVariety || bean.variety}|PROC:${finalProcess}|KG:${totalKg}|MC:${moistureContent}%`,
@@ -597,8 +599,9 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                   <input
                     type="number"
                     min="1"
-                    value={bagCount}
-                    onChange={(e) => setBagCount(Number(e.target.value))}
+                    value={bagCount === 0 || bagCount === '' ? '' : bagCount}
+                    onChange={(e) => setBagCount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
@@ -607,15 +610,16 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                   <input
                     type="number"
                     min="1"
-                    value={bagWeightKg}
-                    onChange={(e) => setBagWeightKg(Number(e.target.value))}
+                    value={bagWeightKg === 0 || bagWeightKg === '' ? '' : bagWeightKg}
+                    onChange={(e) => setBagWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">Total Bobot Intake</label>
                   <div className="rounded-lg bg-zinc-100 px-3 py-1.5 font-bold text-zinc-900">
-                    {(bagCount * bagWeightKg).toLocaleString('id-ID')} kg
+                    {((Number(bagCount) || 0) * (Number(bagWeightKg) || 0)).toLocaleString('id-ID')} kg
                   </div>
                 </div>
               </div>
@@ -654,8 +658,9 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                   <input
                     type="number"
                     step="0.1"
-                    value={moistureContent}
-                    onChange={(e) => setMoistureContent(Number(e.target.value))}
+                    value={moistureContent === 0 || moistureContent === '' ? '' : moistureContent}
+                    onChange={(e) => setMoistureContent(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
@@ -663,8 +668,9 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                   <label className="block font-semibold text-zinc-700 mb-1">Kerapatan (g/L)</label>
                   <input
                     type="number"
-                    value={densityGramsPerLiter}
-                    onChange={(e) => setDensityGramsPerLiter(Number(e.target.value))}
+                    value={densityGramsPerLiter === 0 || densityGramsPerLiter === '' ? '' : densityGramsPerLiter}
+                    onChange={(e) => setDensityGramsPerLiter(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>

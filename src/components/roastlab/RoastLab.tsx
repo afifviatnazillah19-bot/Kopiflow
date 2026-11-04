@@ -60,32 +60,36 @@ export const RoastLab: React.FC<RoastLabProps> = ({
   const [roasterMachine, setRoasterMachine] = useState<string>('Mesin Roasting Rakitan (Drum 1-5 kg)');
   const [customMachineName, setCustomMachineName] = useState<string>('');
   const [roastProfileLevel, setRoastProfileLevel] = useState<RoastLevel>('Medium-Light');
-  const [greenWeightGrams, setGreenWeightGrams] = useState<number>(5000);
-  const [roastedWeightGrams, setRoastedWeightGrams] = useState<number>(4320);
-  const [chargeTempC, setChargeTempC] = useState<number>(198);
-  const [turningPointTempC, setTurningPointTempC] = useState<number>(92);
-  const [turningPointTimeSec, setTurningPointTimeSec] = useState<number>(85);
-  const [dryEndTempC, setDryEndTempC] = useState<number>(154);
-  const [dryEndTimeSec, setDryEndTimeSec] = useState<number>(295);
-  const [firstCrackTempC, setFirstCrackTempC] = useState<number>(196);
-  const [firstCrackTimeSec, setFirstCrackTimeSec] = useState<number>(520);
-  const [dropTempC, setDropTempC] = useState<number>(208);
-  const [totalTimeSec, setTotalTimeSec] = useState<number>(640);
-  const [cuppingScore, setCuppingScore] = useState<number>(87.5);
+  const [greenWeightGrams, setGreenWeightGrams] = useState<number | ''>(5000);
+  const [roastedWeightGrams, setRoastedWeightGrams] = useState<number | ''>(4320);
+  const [chargeTempC, setChargeTempC] = useState<number | ''>(198);
+  const [turningPointTempC, setTurningPointTempC] = useState<number | ''>(92);
+  const [turningPointTimeSec, setTurningPointTimeSec] = useState<number | ''>(85);
+  const [dryEndTempC, setDryEndTempC] = useState<number | ''>(154);
+  const [dryEndTimeSec, setDryEndTimeSec] = useState<number | ''>(295);
+  const [firstCrackTempC, setFirstCrackTempC] = useState<number | ''>(196);
+  const [firstCrackTimeSec, setFirstCrackTimeSec] = useState<number | ''>(520);
+  const [dropTempC, setDropTempC] = useState<number | ''>(208);
+  const [totalTimeSec, setTotalTimeSec] = useState<number | ''>(640);
+  const [cuppingScore, setCuppingScore] = useState<number | ''>(87.5);
   const [cuppingNotes, setCuppingNotes] = useState<string>('Bergamot, orange blossom, brown sugar sweetness, crisp malic acidity');
   const [roasterOperator, setRoasterOperator] = useState<string>('Hendra Setiawan (Head Roaster)');
   const [roastDate, setRoastDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [roastStatus, setRoastStatus] = useState<RoastStatus>('Passed QC');
 
   // Calculations
+  const gWeight = Number(greenWeightGrams) || 0;
+  const rWeight = Number(roastedWeightGrams) || 0;
   const weightLossPct =
-    greenWeightGrams > 0
-      ? Number((((greenWeightGrams - roastedWeightGrams) / greenWeightGrams) * 100).toFixed(2))
+    gWeight > 0
+      ? Number((((gWeight - rWeight) / gWeight) * 100).toFixed(2))
       : 0;
 
+  const tTime = Number(totalTimeSec) || 0;
+  const fcTime = Number(firstCrackTimeSec) || 0;
   const dtrPct =
-    totalTimeSec > firstCrackTimeSec
-      ? Number((((totalTimeSec - firstCrackTimeSec) / totalTimeSec) * 100).toFixed(2))
+    tTime > fcTime
+      ? Number((((tTime - fcTime) / tTime) * 100).toFixed(2))
       : 0;
 
   const handleCreateRoast = async (e: React.FormEvent) => {
@@ -108,20 +112,20 @@ export const RoastLab: React.FC<RoastLabProps> = ({
       batchLotNumber,
       roasterMachine: finalMachineName,
       roastProfileLevel,
-      greenWeightGrams,
-      roastedWeightGrams,
+      greenWeightGrams: gWeight,
+      roastedWeightGrams: rWeight,
       weightLossPercent: weightLossPct,
-      chargeTempC,
-      turningPointTempC,
-      turningPointTimeSec,
-      dryEndTempC,
-      dryEndTimeSec,
-      firstCrackTempC,
-      firstCrackTimeSec,
-      dropTempC,
-      totalTimeSec,
+      chargeTempC: Number(chargeTempC) || 0,
+      turningPointTempC: Number(turningPointTempC) || 0,
+      turningPointTimeSec: Number(turningPointTimeSec) || 0,
+      dryEndTempC: Number(dryEndTempC) || 0,
+      dryEndTimeSec: Number(dryEndTimeSec) || 0,
+      firstCrackTempC: Number(firstCrackTempC) || 0,
+      firstCrackTimeSec: fcTime,
+      dropTempC: Number(dropTempC) || 0,
+      totalTimeSec: tTime,
       dtrPercent: dtrPct,
-      cuppingScore,
+      cuppingScore: Number(cuppingScore) || 0,
       cuppingNotes,
       roasterOperator,
       roastDate: roastDate || new Date().toISOString().split('T')[0],
@@ -796,8 +800,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                     <input
                       type="number"
                       required
-                      value={greenWeightGrams}
-                      onChange={(e) => setGreenWeightGrams(Number(e.target.value))}
+                      value={greenWeightGrams === 0 || greenWeightGrams === '' ? '' : greenWeightGrams}
+                      onChange={(e) => setGreenWeightGrams(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
                       className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 font-mono"
                     />
                   </div>
@@ -806,8 +811,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                     <input
                       type="number"
                       required
-                      value={roastedWeightGrams}
-                      onChange={(e) => setRoastedWeightGrams(Number(e.target.value))}
+                      value={roastedWeightGrams === 0 || roastedWeightGrams === '' ? '' : roastedWeightGrams}
+                      onChange={(e) => setRoastedWeightGrams(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
                       className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 font-mono"
                     />
                   </div>
@@ -826,8 +832,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">Charge Temp (°C)</label>
                   <input
                     type="number"
-                    value={chargeTempC}
-                    onChange={(e) => setChargeTempC(Number(e.target.value))}
+                    value={chargeTempC === 0 || chargeTempC === '' ? '' : chargeTempC}
+                    onChange={(e) => setChargeTempC(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -835,8 +842,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">Turning Point (°C)</label>
                   <input
                     type="number"
-                    value={turningPointTempC}
-                    onChange={(e) => setTurningPointTempC(Number(e.target.value))}
+                    value={turningPointTempC === 0 || turningPointTempC === '' ? '' : turningPointTempC}
+                    onChange={(e) => setTurningPointTempC(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -844,8 +852,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">First Crack Temp (°C)</label>
                   <input
                     type="number"
-                    value={firstCrackTempC}
-                    onChange={(e) => setFirstCrackTempC(Number(e.target.value))}
+                    value={firstCrackTempC === 0 || firstCrackTempC === '' ? '' : firstCrackTempC}
+                    onChange={(e) => setFirstCrackTempC(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -853,8 +862,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">Drop Temp (°C)</label>
                   <input
                     type="number"
-                    value={dropTempC}
-                    onChange={(e) => setDropTempC(Number(e.target.value))}
+                    value={dropTempC === 0 || dropTempC === '' ? '' : dropTempC}
+                    onChange={(e) => setDropTempC(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -866,8 +876,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">TP Waktu (detik)</label>
                   <input
                     type="number"
-                    value={turningPointTimeSec}
-                    onChange={(e) => setTurningPointTimeSec(Number(e.target.value))}
+                    value={turningPointTimeSec === 0 || turningPointTimeSec === '' ? '' : turningPointTimeSec}
+                    onChange={(e) => setTurningPointTimeSec(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -875,8 +886,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">Dry End Waktu (detik)</label>
                   <input
                     type="number"
-                    value={dryEndTimeSec}
-                    onChange={(e) => setDryEndTimeSec(Number(e.target.value))}
+                    value={dryEndTimeSec === 0 || dryEndTimeSec === '' ? '' : dryEndTimeSec}
+                    onChange={(e) => setDryEndTimeSec(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -884,8 +896,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">FC Start Waktu (detik)</label>
                   <input
                     type="number"
-                    value={firstCrackTimeSec}
-                    onChange={(e) => setFirstCrackTimeSec(Number(e.target.value))}
+                    value={firstCrackTimeSec === 0 || firstCrackTimeSec === '' ? '' : firstCrackTimeSec}
+                    onChange={(e) => setFirstCrackTimeSec(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -893,8 +906,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-0.5">Total Waktu (detik)</label>
                   <input
                     type="number"
-                    value={totalTimeSec}
-                    onChange={(e) => setTotalTimeSec(Number(e.target.value))}
+                    value={totalTimeSec === 0 || totalTimeSec === '' ? '' : totalTimeSec}
+                    onChange={(e) => setTotalTimeSec(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded border border-zinc-200 px-2 py-1 font-mono"
                   />
                 </div>
@@ -907,8 +921,9 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   <input
                     type="number"
                     step="0.25"
-                    value={cuppingScore}
-                    onChange={(e) => setCuppingScore(Number(e.target.value))}
+                    value={cuppingScore === 0 || cuppingScore === '' ? '' : cuppingScore}
+                    onChange={(e) => setCuppingScore(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-bold text-emerald-800 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>

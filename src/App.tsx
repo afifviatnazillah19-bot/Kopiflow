@@ -19,7 +19,9 @@ import { OrderManager } from './components/orders/OrderManager';
 import { RoastLab } from './components/roastlab/RoastLab';
 import { ShipmentTracker } from './components/logistics/ShipmentTracker';
 import { NotificationCenter } from './components/notifications/NotificationCenter';
+import { DensityCalculator } from './components/density/DensityCalculator';
 import { BatchScannerModal } from './components/scanner/BatchScannerModal';
+
 import { DataSettingsManager } from './components/settings/DataSettingsManager';
 import {
   CoffeeBean,
@@ -127,7 +129,7 @@ export default function App() {
   ).length;
 
   return (
-    <div className="flex flex-col h-screen w-full bg-zinc-100 font-sans text-zinc-900 antialiased overflow-hidden">
+    <div className="flex flex-col h-screen h-[100dvh] w-full bg-zinc-100 font-sans text-zinc-900 antialiased overflow-hidden overscroll-none">
       {/* Top Header with Modern Top Navigation */}
       <Header
         currentTab={currentTab}
@@ -152,8 +154,11 @@ export default function App() {
         partnersCount={partners.length}
       />
 
-      {/* Scrollable Viewport Container */}
-      <main className="flex-1 overflow-y-auto p-2.5 sm:p-4 md:p-6 lg:p-8">
+      {/* Scrollable Viewport Container with overscroll containment */}
+      <main
+        className="flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-4 md:p-6 lg:p-8 touch-pan-y"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+      >
           <div className="mx-auto max-w-7xl">
             {currentTab === 'dashboard' && (
               <OverviewDashboard
@@ -185,6 +190,14 @@ export default function App() {
               />
             )}
 
+            {currentTab === 'density' && (
+              <DensityCalculator
+                beans={beans}
+                batches={batches}
+                onRefresh={handleManualRefresh}
+              />
+            )}
+
             {currentTab === 'roasted-beans' && (
               <RoastedBeansWarehouse
                 beans={beans}
@@ -195,6 +208,7 @@ export default function App() {
                 }}
               />
             )}
+
 
             {(currentTab === 'finance' || currentTab === 'pricing') && (
               <FinanceAndPricing

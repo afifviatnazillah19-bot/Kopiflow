@@ -91,6 +91,7 @@ export interface CoffeeBean {
   priceLuarPulauPerKg: number;
   storageLocation: string;
   moistureAvgPercent: number;
+  densityGramsPerLiter?: number;
   // HPP (Harga Pokok Produksi) & Cost Structure per Kg
   costGreenPerKg?: number;
   costRoastingPerKg?: number;
@@ -102,6 +103,35 @@ export interface CoffeeBean {
   updatedAt: string;
   createdAt: string;
 }
+
+export interface DensityTestLog {
+  id: string;
+  sampleType: 'green' | 'roasted';
+  beanId?: string;
+  beanName: string;
+  lotNumber?: string;
+  variety?: string;
+  process?: string;
+  method: 'volumetric' | 'displacement';
+  tareWeightG: number;
+  grossWeightG: number;
+  netWeightG: number;
+  volumeMl: number;
+  densityGPerL: number;
+  densityGPerMl: number;
+  densityKgPerM3: number;
+  moisturePercent?: number;
+  elevationMdpl?: number;
+  scaClassification: string;
+  recommendedChargeTemp?: string;
+  recommendedAirflow?: string;
+  recommendedHeat?: string;
+  recommendedDtr?: string;
+  notes?: string;
+  testedBy: string;
+  testedAt: string;
+}
+
 
 export type WhatsAppProvider = 'direct' | 'openwa';
 

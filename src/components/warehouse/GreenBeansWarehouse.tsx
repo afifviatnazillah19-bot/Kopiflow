@@ -87,11 +87,11 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [inboundLotNumber, setInboundLotNumber] = useState(
     `LOT-GY-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
   );
-  const [inboundWeightKg, setInboundWeightKg] = useState<number>(300);
-  const [inboundBagCount, setInboundBagCount] = useState<number>(5);
+  const [inboundWeightKg, setInboundWeightKg] = useState<number | ''>(300);
+  const [inboundBagCount, setInboundBagCount] = useState<number | ''>(5);
   const [inboundBagType, setInboundBagType] = useState('GrainPro 60kg + Karung Goni');
-  const [inboundMoisture, setInboundMoisture] = useState<number>(11.5);
-  const [inboundDensity, setInboundDensity] = useState<number>(710);
+  const [inboundMoisture, setInboundMoisture] = useState<number | ''>(11.5);
+  const [inboundDensity, setInboundDensity] = useState<number | ''>(710);
   const [inboundStorageLoc, setInboundStorageLoc] = useState('Silo A-01 (Palet Kayu Terlindung)');
   const [inboundSupplierNote, setInboundSupplierNote] = useState('Surat Jalan Pabrik No. SJ-PBR/2026/089');
   const [inboundReceiver, setInboundReceiver] = useState('Aman Fauzi (Staff Gudang Mentah)');
@@ -105,10 +105,11 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [isCustomEditProcess, setIsCustomEditProcess] = useState(false);
   const [editOrigin, setEditOrigin] = useState('');
   const [editGrade, setEditGrade] = useState('Specialty');
-  const [editGreenStock, setEditGreenStock] = useState<number>(0);
-  const [editMinAlert, setEditMinAlert] = useState<number>(100);
-  const [editMoisture, setEditMoisture] = useState<number>(11.2);
+  const [editGreenStock, setEditGreenStock] = useState<number | ''>(0);
+  const [editMinAlert, setEditMinAlert] = useState<number | ''>(100);
+  const [editMoisture, setEditMoisture] = useState<number | ''>(11.2);
   const [editStorageLoc, setEditStorageLoc] = useState('');
+
 
   const totalGreenStockKg = beans.reduce((acc, b) => acc + (b.stockGreenKg || 0), 0);
   const lowGreenBeans = beans.filter((b) => b.stockGreenKg <= b.minAlertKg);
@@ -143,8 +144,9 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
   const [notifConfig, setNotifConfig] = useState<BusinessNotificationConfig>(DEFAULT_NOTIFICATION_CONFIG);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [beanForThresholdEdit, setBeanForThresholdEdit] = useState<CoffeeBean | null>(null);
-  const [tempThresholdKg, setTempThresholdKg] = useState<number>(100);
+  const [tempThresholdKg, setTempThresholdKg] = useState<number | ''>(100);
   const [alertDispatchModalBean, setAlertDispatchModalBean] = useState<CoffeeBean | null>(null);
+
 
   useEffect(() => {
     const unsub = subscribeToNotificationConfig((cfg) => {
@@ -336,11 +338,12 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
     const finalVariety = inboundVariety.trim() || 'Timtim & Ateng Super';
 
     // Find or create matching bean
-    let targetBean = beans.find(
+    let targetBean: CoffeeBean;
+    const existingBean = beans.find(
       (b) => b.name.toLowerCase().trim() === inboundBeanName.toLowerCase().trim()
     );
 
-    if (!targetBean) {
+    if (!existingBean) {
       targetBean = {
         id: `bean-${Date.now().toString(36)}`,
         name: inboundBeanName,
@@ -355,12 +358,13 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
         priceUmkmPerKg: 135000,
         priceLuarPulauPerKg: 160000,
         storageLocation: inboundStorageLoc,
-        moistureAvgPercent: inboundMoisture,
+        moistureAvgPercent: Number(inboundMoisture) || 11.5,
         updatedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       };
       await saveBean(targetBean);
     } else {
+      targetBean = existingBean;
       // If user provided custom variety or process, update master bean
       let changed = false;
       const updatedBean = { ...targetBean };
@@ -445,128 +449,130 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
       )}
 
       {/* Workflow Banner: Pabrik -> Gudang Green Beans -> Roast Lab -> Gudang Roast Beans */}
-      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-900 via-zinc-900 to-amber-950 p-5 text-white shadow-md">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Workflow Banner: Pabrik -> Gudang Green Beans -> Roast Lab -> Gudang Roast Beans */}
+      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-900 via-zinc-900 to-amber-950 p-3.5 sm:p-5 text-white shadow-md">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/30">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/30">
               <Wheat className="h-3.5 w-3.5" />
               Gudang Green Beans (Biji Mentah)
             </div>
-            <h2 className="text-xl font-bold tracking-tight mt-2 text-white">
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight mt-1.5 sm:mt-2 text-white">
               Penerimaan Biji dari Pabrik / Petani & Manajemen Lot
             </h2>
-            <p className="text-xs text-zinc-300 mt-1 max-w-2xl">
-              Alur Gudang KopiFlow: Green beans masuk dari pabrik/kebun mitra, disimpan dalam karung GrainPro/silo, dipantau kadar air (10-12% ideal), lalu dialihkan ke <strong>Roast Lab</strong> untuk proses sangrai.
+            <p className="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+              Alur Gudang KopiFlow: Biji masuk dari mitra, disimpan di silo/GrainPro, dipantau kadar air (10-12%), dan ditransfer ke <strong>Roast Lab</strong>.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => setIsNewInboundModalOpen(true)}
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 transition-colors"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 transition-colors active:scale-95"
             >
               <Plus className="h-4 w-4" />
-              Terima Green Beans dari Pabrik
+              <span>Terima Green Beans dari Pabrik</span>
             </button>
           </div>
         </div>
 
-        {/* Visual Workflow Steps */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-4 gap-2 pt-4 border-t border-zinc-700/60 text-xs">
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-500/20 p-2.5 ring-1 ring-emerald-500/40">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white font-bold text-[11px]">1</div>
+        {/* Visual Workflow Steps (Hidden on tiny mobile screens to preserve viewport space, visible on tablet/desktop) */}
+        <div className="hidden sm:grid grid-cols-2 md:grid-cols-4 gap-2 pt-3 sm:pt-4 border-t border-zinc-700/60 text-xs mt-3 sm:mt-4">
+          <div className="flex items-center gap-2 rounded-lg bg-emerald-500/20 p-2 sm:p-2.5 ring-1 ring-emerald-500/40">
+            <div className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-emerald-500 text-white font-bold text-[10px] sm:text-[11px]">1</div>
             <div>
-              <span className="font-bold text-emerald-200 block">Pabrik / Petani</span>
-              <span className="text-[10px] text-zinc-300">Pengiriman biji mentah</span>
+              <span className="font-bold text-emerald-200 block text-[11px] sm:text-xs">Pabrik / Petani</span>
+              <span className="text-[9px] sm:text-[10px] text-zinc-300">Pengiriman biji</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-700/40 p-2.5 ring-1 ring-emerald-400">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400 text-zinc-950 font-bold text-[11px]">2</div>
+          <div className="flex items-center gap-2 rounded-lg bg-emerald-700/40 p-2 sm:p-2.5 ring-1 ring-emerald-400">
+            <div className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-emerald-400 text-zinc-950 font-bold text-[10px] sm:text-[11px]">2</div>
             <div>
-              <span className="font-bold text-white block">Gudang Green Beans</span>
-              <span className="text-[10px] text-emerald-200">Ukur kadar air, lot, karung</span>
+              <span className="font-bold text-white block text-[11px] sm:text-xs">Gudang Green Beans</span>
+              <span className="text-[9px] sm:text-[10px] text-emerald-200">Kadar air, lot, karung</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-zinc-800/80 p-2.5 text-zinc-300">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700 text-zinc-300 font-bold text-[11px]">3</div>
+          <div className="flex items-center gap-2 rounded-lg bg-zinc-800/80 p-2 sm:p-2.5 text-zinc-300">
+            <div className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-zinc-700 text-zinc-300 font-bold text-[10px] sm:text-[11px]">3</div>
             <div>
-              <span className="font-semibold block text-zinc-200">Roast Lab & Sangrai</span>
-              <span className="text-[10px] text-zinc-400">Transfer & proses sangrai</span>
+              <span className="font-semibold block text-zinc-200 text-[11px] sm:text-xs">Roast Lab & Sangrai</span>
+              <span className="text-[9px] sm:text-[10px] text-zinc-400">Transfer sangrai</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-zinc-800/80 p-2.5 text-zinc-300">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700 text-zinc-300 font-bold text-[11px]">4</div>
+          <div className="flex items-center gap-2 rounded-lg bg-zinc-800/80 p-2 sm:p-2.5 text-zinc-300">
+            <div className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-zinc-700 text-zinc-300 font-bold text-[10px] sm:text-[11px]">4</div>
             <div>
-              <span className="font-semibold block text-zinc-200">Gudang Roast Beans</span>
-              <span className="text-[10px] text-zinc-400">Stok matang & degassing</span>
+              <span className="font-semibold block text-zinc-200 text-[11px] sm:text-xs">Gudang Roast Beans</span>
+              <span className="text-[9px] sm:text-[10px] text-zinc-400">Stok & degassing</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Green Beans</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-              <Wheat className="h-4 w-4" />
+      {/* Metric Cards: 2-columns on mobile, 4-columns on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="rounded-xl sm:rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">Total Green Beans</span>
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
+              <Wheat className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-zinc-900 font-mono">
-            {totalGreenStockKg.toLocaleString('id-ID')} <span className="text-xs font-semibold text-zinc-500">kg</span>
+          <div className="text-lg sm:text-2xl font-black text-zinc-900 font-mono">
+            {totalGreenStockKg.toLocaleString('id-ID')} <span className="text-[10px] sm:text-xs font-semibold text-zinc-500">kg</span>
           </div>
-          <p className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1">
-            <Box className="h-3 w-3 text-emerald-600" />
-            Estimasi ~{totalBagsEstimate} karung GrainPro/Jute (60kg)
+          <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 sm:mt-1 flex items-center gap-1 truncate">
+            <Box className="h-3 w-3 text-emerald-600 shrink-0" />
+            ~{totalBagsEstimate} karung 60kg
           </p>
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Varietas & Jenis Biji</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-              <Layers className="h-4 w-4" />
+        <div className="rounded-xl sm:rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">Varietas SKU</span>
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 shrink-0">
+              <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-zinc-900 font-mono">{beans.length} SKU</div>
-          <p className="text-[11px] text-zinc-500 mt-1">Katalog biji mentah terdaftar</p>
+          <div className="text-lg sm:text-2xl font-black text-zinc-900 font-mono">{beans.length} SKU</div>
+          <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 sm:mt-1 truncate">Katalog biji mentah</p>
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Rata-rata Kadar Air (MC)</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <Droplet className="h-4 w-4" />
+        <div className="rounded-xl sm:rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">Rata-rata MC</span>
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shrink-0">
+              <Droplet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-zinc-900 font-mono">
+          <div className="text-lg sm:text-2xl font-black text-zinc-900 font-mono">
             {beans.length > 0
               ? (beans.reduce((acc, b) => acc + (b.moistureAvgPercent || 11.5), 0) / beans.length).toFixed(1)
               : '11.5'}
             %
           </div>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> Standar aman SCA (10.0% - 12.0%)
+          <p className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1 truncate">
+            <CheckCircle2 className="h-3 w-3 shrink-0" /> Standar SCA (10-12%)
           </p>
         </div>
 
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between text-zinc-500 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Peringatan Stok Tipis</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-              <AlertTriangle className="h-4 w-4" />
+        <div className="rounded-xl sm:rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between text-zinc-500 mb-1 sm:mb-2">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider truncate">Stok Tipis</span>
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600 shrink-0">
+              <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-zinc-900 font-mono">{lowGreenBeans.length}</div>
-          <p className="text-[11px] text-rose-600 mt-1">
-            {lowGreenBeans.length > 0 ? 'Perlu order pasokan dari pabrik' : 'Semua stok dalam batas aman'}
+          <div className="text-lg sm:text-2xl font-black text-zinc-900 font-mono">{lowGreenBeans.length}</div>
+          <p className="text-[10px] sm:text-[11px] text-rose-600 mt-0.5 sm:mt-1 truncate">
+            {lowGreenBeans.length > 0 ? 'Perlu order pasokan' : 'Aman terkendali'}
           </p>
         </div>
       </div>
+
 
       {/* BANNER PERINGATAN OTOMATIS: STOK GUDANG MENIPIS */}
       {lowGreenBeans.length > 0 && (
@@ -999,37 +1005,45 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
 
       {/* Modal: Inbound from Factory/Farmer */}
       {isNewInboundModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 p-4 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200 my-8">
-            <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
-                  <Wheat className="h-5 w-5 text-emerald-700" />
-                  Penerimaan Green Beans dari Pabrik / Petani
-                </h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Catat kedatangan biji kopi mentah, lot panen, dan tambahkan otomatis ke stok gudang.
-                </p>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-start sm:justify-center bg-zinc-950/75 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto overscroll-contain">
+          <div className="w-full max-w-2xl max-h-[92dvh] sm:max-h-[88dvh] flex flex-col rounded-2xl bg-white shadow-2xl border border-zinc-200 my-auto overflow-hidden">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2.5 sm:px-6 sm:py-3.5 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 shrink-0">
+                  <Wheat className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 truncate">
+                    Penerimaan Green Beans dari Pabrik
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-zinc-500 truncate hidden sm:block">
+                    Catat kedatangan biji kopi mentah, lot panen, dan tambahkan otomatis ke stok gudang.
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsNewInboundModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-600 font-bold"
+                className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 font-bold shrink-0 ml-2"
+                title="Tutup Modal"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateInbound} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleCreateInbound} className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5 space-y-3 sm:space-y-3.5 text-xs">
               {/* Select from Partner Database (Relasi) */}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 space-y-2.5">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 sm:p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block font-bold text-emerald-950 text-xs">
                     Pilih Pemasok dari Database Relasi / Mitra ({partners.length} Terdaftar)
                   </label>
-                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase">
+                  <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-white uppercase">
                     Relasi ERP
                   </span>
                 </div>
+
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1310,55 +1324,60 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-emerald-50/60 p-3 rounded-xl border border-emerald-100">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 bg-emerald-50/60 p-2.5 sm:p-3 rounded-xl border border-emerald-100">
                 <div>
-                  <label className="block font-bold text-emerald-950 mb-1">Total Berat (kg)</label>
+                  <label className="block font-bold text-emerald-950 mb-1 text-[11px] sm:text-xs">Total Berat (kg)</label>
                   <input
                     type="number"
                     min="0.01"
                     step="any"
                     required
-                    value={inboundWeightKg}
-                    onChange={(e) => setInboundWeightKg(Number(e.target.value))}
-                    className="w-full rounded-lg border border-emerald-300 px-3 py-1.5 font-mono font-bold text-sm bg-white"
+                    value={inboundWeightKg === 0 || inboundWeightKg === '' ? '' : inboundWeightKg}
+                    onChange={(e) => setInboundWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-emerald-300 px-2.5 py-1.5 font-mono font-bold text-xs sm:text-sm bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-emerald-950 mb-1">Jumlah Karung</label>
+                  <label className="block font-bold text-emerald-950 mb-1 text-[11px] sm:text-xs">Jumlah Karung</label>
                   <input
                     type="number"
                     min="1"
-                    value={inboundBagCount}
-                    onChange={(e) => setInboundBagCount(Number(e.target.value))}
-                    className="w-full rounded-lg border border-emerald-300 px-3 py-1.5 font-mono text-sm bg-white"
+                    value={inboundBagCount === 0 || inboundBagCount === '' ? '' : inboundBagCount}
+                    onChange={(e) => setInboundBagCount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-emerald-300 px-2.5 py-1.5 font-mono text-xs sm:text-sm bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-emerald-950 mb-1">Kadar Air (MC %)</label>
+                  <label className="block font-bold text-emerald-950 mb-1 text-[11px] sm:text-xs">Kadar Air (MC %)</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={inboundMoisture}
-                    onChange={(e) => setInboundMoisture(Number(e.target.value))}
-                    className="w-full rounded-lg border border-emerald-300 px-3 py-1.5 font-mono text-sm bg-white"
+                    value={inboundMoisture === 0 || inboundMoisture === '' ? '' : inboundMoisture}
+                    onChange={(e) => setInboundMoisture(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-emerald-300 px-2.5 py-1.5 font-mono text-xs sm:text-sm bg-white"
                   />
-                  <span className="text-[10px] text-emerald-700">Ideal: 10 - 12%</span>
+                  <span className="text-[9px] sm:text-[10px] text-emerald-700">Ideal: 10 - 12%</span>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-emerald-950 mb-1">Densitas (g/L)</label>
+                  <label className="block font-bold text-emerald-950 mb-1 text-[11px] sm:text-xs">Densitas (g/L)</label>
                   <input
                     type="number"
-                    value={inboundDensity}
-                    onChange={(e) => setInboundDensity(Number(e.target.value))}
-                    className="w-full rounded-lg border border-emerald-300 px-3 py-1.5 font-mono text-sm bg-white"
+                    value={inboundDensity === 0 || inboundDensity === '' ? '' : inboundDensity}
+                    onChange={(e) => setInboundDensity(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full rounded-lg border border-emerald-300 px-2.5 py-1.5 font-mono text-xs sm:text-sm bg-white"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">Kemasan Karung & Proteksi</label>
                   <input
@@ -1366,7 +1385,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     value={inboundBagType}
                     onChange={(e) => setInboundBagType(e.target.value)}
                     placeholder="cth: GrainPro Hermetic 60kg + Karung Goni"
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 sm:py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
 
@@ -1377,12 +1396,12 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     value={inboundStorageLoc}
                     onChange={(e) => setInboundStorageLoc(e.target.value)}
                     placeholder="cth: Silo A-01 (Palet Kayu)"
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 sm:py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">No. Surat Jalan Pabrik / Referensi</label>
                   <input
@@ -1390,7 +1409,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     value={inboundSupplierNote}
                     onChange={(e) => setInboundSupplierNote(e.target.value)}
                     placeholder="cth: SJ-PABRIK-2026/089"
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 sm:py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
 
@@ -1400,22 +1419,23 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     type="text"
                     value={inboundReceiver}
                     onChange={(e) => setInboundReceiver(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-1.5 sm:py-2 text-xs focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200">
+              {/* Sticky Footer Action Bar */}
+              <div className="sticky bottom-0 z-20 -mx-3 -mb-3 sm:-mx-5 sm:-mb-5 mt-4 flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50/95 px-4 py-2.5 sm:px-6 sm:py-3 shrink-0 backdrop-blur-xs">
                 <button
                   type="button"
                   onClick={() => setIsNewInboundModalOpen(false)}
-                  className="rounded-xl border border-zinc-200 px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50"
+                  className="rounded-xl border border-zinc-200 bg-white px-3 sm:px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-emerald-700 px-5 py-2 font-bold text-white shadow-sm hover:bg-emerald-800"
+                  className="rounded-xl bg-emerald-700 px-4 sm:px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 active:scale-95 transition-transform"
                 >
                   Simpan Penerimaan & Tambah Stok
                 </button>
@@ -1425,29 +1445,33 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
         </div>
       )}
 
+
       {/* Modal: Direct Stock Opname & Edit Master Bean */}
       {selectedBeanForOpname && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-zinc-200 my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900">
-                  Edit Master Biji & Opname Stok: {selectedBeanForOpname.name}
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-start sm:justify-center bg-zinc-950/75 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto overscroll-contain">
+          <div className="w-full max-w-lg max-h-[92dvh] sm:max-h-[88dvh] flex flex-col rounded-2xl bg-white shadow-2xl border border-zinc-200 my-auto overflow-hidden">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2.5 sm:px-6 sm:py-3.5 shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-bold text-zinc-900 truncate">
+                  Edit Master Biji & Opname: {selectedBeanForOpname.name}
                 </h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Ubah nama varietas, proses pascapanen, mutu, serta sesuaikan stok fisik gudang.
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 truncate hidden sm:block">
+                  Ubah nama varietas, proses pascapanen, mutu, serta stok fisik.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedBeanForOpname(null)}
-                className="text-zinc-400 hover:text-zinc-700 text-sm font-bold"
+                className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 font-bold shrink-0 ml-2"
+                title="Tutup Modal"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveOpname} className="mt-4 space-y-3.5 text-xs">
+            <form onSubmit={handleSaveOpname} className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 text-xs">
+
               {/* Nama Biji & Asal */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -1607,8 +1631,9 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   <input
                     type="number"
                     min="0"
-                    value={editGreenStock}
-                    onChange={(e) => setEditGreenStock(Number(e.target.value))}
+                    value={editGreenStock === 0 || editGreenStock === '' ? '' : editGreenStock}
+                    onChange={(e) => setEditGreenStock(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 font-mono font-bold text-sm text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
@@ -1618,8 +1643,9 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   <input
                     type="number"
                     min="0"
-                    value={editMinAlert}
-                    onChange={(e) => setEditMinAlert(Number(e.target.value))}
+                    value={editMinAlert === 0 || editMinAlert === '' ? '' : editMinAlert}
+                    onChange={(e) => setEditMinAlert(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 font-mono text-zinc-900 focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
@@ -1631,12 +1657,14 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   <input
                     type="number"
                     step="0.1"
-                    value={editMoisture}
-                    onChange={(e) => setEditMoisture(Number(e.target.value))}
+                    value={editMoisture === 0 || editMoisture === '' ? '' : editMoisture}
+                    onChange={(e) => setEditMoisture(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono focus:border-emerald-600 focus:outline-hidden"
                   />
                   <span className="text-[10px] text-zinc-500 mt-0.5 block">Ideal SCA: 10 - 12%</span>
                 </div>
+
 
                 <div>
                   <label className="block font-semibold text-zinc-700 mb-1">Lokasi Penyimpanan (Silo / Palet)</label>
@@ -1650,17 +1678,18 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200">
+              {/* Sticky Footer */}
+              <div className="sticky bottom-0 z-20 -mx-3.5 -mb-3.5 sm:-mx-5 sm:-mb-5 mt-4 flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50/95 px-4 py-2.5 sm:px-6 sm:py-3 shrink-0 backdrop-blur-xs">
                 <button
                   type="button"
                   onClick={() => setSelectedBeanForOpname(null)}
-                  className="rounded-xl border border-zinc-200 px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50"
+                  className="rounded-xl border border-zinc-200 bg-white px-3 sm:px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-emerald-700 px-5 py-2 font-bold text-white hover:bg-emerald-800"
+                  className="rounded-xl bg-emerald-700 px-4 sm:px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 active:scale-95 transition-transform"
                 >
                   Simpan Perubahan & Opname
                 </button>
@@ -1669,6 +1698,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
           </div>
         </div>
       )}
+
 
       {/* MODAL: UBAH BATAS MINIMAL STOK GUDANG */}
       {beanForThresholdEdit && (
@@ -1693,13 +1723,15 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     type="number"
                     min="0.01"
                     step="any"
-                    value={tempThresholdKg}
-                    onChange={(e) => setTempThresholdKg(Number(e.target.value))}
+                    value={tempThresholdKg === 0 || tempThresholdKg === '' ? '' : tempThresholdKg}
+                    onChange={(e) => setTempThresholdKg(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-xl border border-zinc-300 px-3 py-2 font-mono font-bold text-base text-zinc-900 focus:border-amber-600 focus:outline-hidden"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">
                     kg
                   </span>
+
                 </div>
                 <p className="text-[11px] text-zinc-500 mt-1">
                   Stok fisik saat ini: <strong>{beanForThresholdEdit.stockGreenKg} kg</strong>
@@ -1737,7 +1769,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSaveThreshold(beanForThresholdEdit, tempThresholdKg)}
+                  onClick={() => handleSaveThreshold(beanForThresholdEdit, Number(tempThresholdKg) || 0)}
                   className="rounded-xl bg-amber-700 px-4 py-1.5 font-bold text-white shadow-xs hover:bg-amber-800"
                 >
                   Simpan Batas Minimal
@@ -1750,31 +1782,34 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
 
       {/* MODAL: PENGATURAN KONTAK NOTIFIKASI BISNIS */}
       {isConfigModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-start sm:justify-center bg-zinc-950/75 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto overscroll-contain">
+          <div className="w-full max-w-lg max-h-[92dvh] sm:max-h-[88dvh] flex flex-col rounded-2xl bg-white shadow-2xl border border-zinc-200 my-auto overflow-hidden">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2.5 sm:px-6 sm:py-3.5 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 shrink-0">
                   <BellRing className="h-4 w-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900">
-                    Pengaturan Kontak Notifikasi Bisnis
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 truncate">
+                    Pengaturan Kontak Notifikasi
                   </h3>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-[10px] sm:text-[11px] text-zinc-500 truncate hidden sm:block">
                     Penerima resmi peringatan stok gudang yang menipis
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsConfigModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 font-bold text-sm"
+                className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 font-bold shrink-0 ml-2"
+                title="Tutup Modal"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveConfig} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleSaveConfig} className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-5 space-y-3.5 text-xs">
               <div>
                 <label className="block font-semibold text-zinc-700 mb-1">
                   Nomor WhatsApp Bisnis / Manajer Gudang
@@ -1791,7 +1826,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     className="w-full rounded-xl border border-zinc-200 pl-9 pr-3 py-2 font-mono font-medium focus:border-emerald-600 focus:outline-hidden"
                   />
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-1">
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-1">
                   Pesan alert WhatsApp akan otomatis diarahkan ke nomor ini saat stok di bawah batas minimal.
                 </p>
               </div>
@@ -1812,7 +1847,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     className="w-full rounded-xl border border-zinc-200 pl-9 pr-3 py-2 font-mono font-medium focus:border-blue-600 focus:outline-hidden"
                   />
                 </div>
-                <p className="text-[11px] text-zinc-500 mt-1">
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-1">
                   Email bisnis tujuan pengiriman template surat peringatan stok gudang KopiFlow.
                 </p>
               </div>
@@ -1846,22 +1881,23 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
                   />
                 </div>
-                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 leading-relaxed">
                   Ketika aktif, banner peringatan menyala merah seketika stok mencapai batas kritis dan sistem menyediakan tombol 1-klik untuk auto-send pesan ke WhatsApp dan Email bisnis.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200">
+              {/* Sticky Footer */}
+              <div className="sticky bottom-0 z-20 -mx-3.5 -mb-3.5 sm:-mx-5 sm:-mb-5 mt-4 flex items-center justify-end gap-2 border-t border-zinc-200 bg-zinc-50/95 px-4 py-2.5 sm:px-6 sm:py-3 shrink-0 backdrop-blur-xs">
                 <button
                   type="button"
                   onClick={() => setIsConfigModalOpen(false)}
-                  className="rounded-xl border border-zinc-200 px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50"
+                  className="rounded-xl border border-zinc-200 bg-white px-3 sm:px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-emerald-700 px-5 py-2 font-bold text-white shadow-xs hover:bg-emerald-800"
+                  className="rounded-xl bg-emerald-700 px-4 sm:px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 active:scale-95 transition-transform"
                 >
                   Simpan Kontak Bisnis
                 </button>
@@ -1871,31 +1907,35 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
         </div>
       )}
 
+
       {/* MODAL: PREVIEW & DISPATCH PERINGATAN 1 SKU */}
       {alertDispatchModalBean && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-zinc-200">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 text-rose-700 font-bold">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-start sm:justify-center bg-zinc-950/75 p-2 sm:p-4 backdrop-blur-xs overflow-y-auto overscroll-contain">
+          <div className="w-full max-w-md max-h-[92dvh] sm:max-h-[88dvh] flex flex-col rounded-2xl bg-white shadow-2xl border border-zinc-200 my-auto overflow-hidden">
+            <div className="sticky top-0 z-20 flex items-center justify-between border-b border-zinc-100 bg-white px-4 py-3 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-rose-100 text-rose-700 font-bold shrink-0">
                   <AlertTriangle className="h-4 w-4" />
                 </span>
-                <div>
-                  <h4 className="font-bold text-sm text-zinc-900">
-                    Peringatan Stok Menipis: {alertDispatchModalBean.name}
+                <div className="min-w-0">
+                  <h4 className="font-bold text-sm text-zinc-900 truncate">
+                    Peringatan: {alertDispatchModalBean.name}
                   </h4>
-                  <p className="text-[11px] text-zinc-500">
-                    Kirim laporan kekurangan stok langsung ke nomor atau email bisnis
+                  <p className="text-[10px] sm:text-[11px] text-zinc-500 truncate hidden sm:block">
+                    Kirim laporan kekurangan stok langsung ke WA atau email bisnis
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setAlertDispatchModalBean(null)}
-                className="text-zinc-400 hover:text-zinc-700 text-sm font-bold"
+                className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 font-bold shrink-0 ml-2"
+                title="Tutup Modal"
               >
                 ✕
               </button>
             </div>
+
 
             <div className="mt-4 space-y-3 text-xs">
               <div className="rounded-xl bg-zinc-50 border border-zinc-200 p-3 space-y-1">

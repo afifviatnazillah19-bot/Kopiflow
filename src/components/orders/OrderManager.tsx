@@ -101,8 +101,8 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
   const [grabVehiclePlate, setGrabVehiclePlate] = useState('');
   const [grabDriverPhone, setGrabDriverPhone] = useState('');
   const [grabOrderPin, setGrabOrderPin] = useState('');
-  const [discount, setDiscount] = useState<number>(0);
-  const [shippingCost, setShippingCost] = useState<number>(35000);
+  const [discount, setDiscount] = useState<number | ''>(0);
+  const [shippingCost, setShippingCost] = useState<number | ''>(35000);
   const [orderDate, setOrderDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
 
@@ -204,7 +204,9 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
   // Subtotals
   const totalWeightKg = orderItems.reduce((sum, item) => sum + item.quantityKg, 0);
   const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const grandTotal = Math.max(0, subtotal - discount + shippingCost);
+  const numericDiscount = Number(discount) || 0;
+  const numericShipping = Number(shippingCost) || 0;
+  const grandTotal = Math.max(0, subtotal - numericDiscount + numericShipping);
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,9 +230,9 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
       items: orderItems,
       totalWeightKg,
       subtotal,
-      discount,
+      discount: numericDiscount,
       tax: 0,
-      shippingCost,
+      shippingCost: numericShipping,
       grandTotal,
       status: 'Confirmed',
       paymentStatus: 'Paid in Full',
@@ -1135,9 +1137,9 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                           type="number"
                           min="0.01"
                           step="any"
-                          value={item.quantityKg}
-                          onChange={(e) => updateItemRow(idx, 'quantityKg', e.target.value)}
-                          placeholder="kg (0.5)"
+                          value={item.quantityKg === 0 ? '' : item.quantityKg}
+                          onChange={(e) => updateItemRow(idx, 'quantityKg', e.target.value === '' ? 0 : Number(e.target.value))}
+                          placeholder="0"
                           className="w-full rounded border border-zinc-200 p-1 text-[11px] font-mono"
                         />
                       </div>
@@ -1166,8 +1168,9 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                   <label className="block font-semibold text-zinc-700 mb-1">Diskon (Rp)</label>
                   <input
                     type="number"
-                    value={discount}
-                    onChange={(e) => setDiscount(Number(e.target.value))}
+                    value={discount === 0 || discount === '' ? '' : discount}
+                    onChange={(e) => setDiscount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
@@ -1175,8 +1178,9 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                   <label className="block font-semibold text-zinc-700 mb-1">Ongkos Kirim Estimasi (Rp)</label>
                   <input
                     type="number"
-                    value={shippingCost}
-                    onChange={(e) => setShippingCost(Number(e.target.value))}
+                    value={shippingCost === 0 || shippingCost === '' ? '' : shippingCost}
+                    onChange={(e) => setShippingCost(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>

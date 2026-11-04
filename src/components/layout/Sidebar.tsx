@@ -14,12 +14,14 @@ import {
   ShieldCheck,
   Settings,
   Wheat,
-  QrCode
+  QrCode,
+  Gauge
 } from 'lucide-react';
 
 export type NavTab =
   | 'dashboard'
   | 'green-beans'
+  | 'density'
   | 'roastlab'
   | 'roasted-beans'
   | 'finance'
@@ -69,12 +71,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: lowStockCount > 0 ? 'bg-rose-500 text-white font-extrabold' : 'bg-emerald-500/20 text-emerald-300'
     },
     {
+      id: 'density' as NavTab,
+      label: 'Kalkulator Densitas Kopi',
+      icon: Gauge,
+      badge: 'g/L QC',
+      badgeColor: 'bg-teal-500/20 text-teal-300'
+    },
+    {
       id: 'roastlab' as NavTab,
       label: 'Roast Lab & Sangrai',
       icon: Flame,
       badge: 'SCA QC',
       badgeColor: 'bg-amber-500/20 text-amber-300'
     },
+
     {
       id: 'roasted-beans' as NavTab,
       label: 'Gudang Roast Beans',
