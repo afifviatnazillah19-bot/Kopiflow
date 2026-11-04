@@ -518,8 +518,8 @@ export async function updateBeanStock(
   const bean = currentBeans.find((b) => b.id === beanId);
   if (!bean) return;
 
-  const newGreen = Math.max(0, bean.stockGreenKg + stockGreenDelta);
-  const newRoasted = Math.max(0, bean.stockRoastedKg + stockRoastedDelta);
+  const newGreen = Math.max(0, Math.round(bean.stockGreenKg + stockGreenDelta));
+  const newRoasted = Math.max(0, Math.round(bean.stockRoastedKg + stockRoastedDelta));
   const updatedBean = {
     ...bean,
     stockGreenKg: newGreen,

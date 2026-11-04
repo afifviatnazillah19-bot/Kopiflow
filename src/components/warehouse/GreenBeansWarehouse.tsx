@@ -534,7 +534,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
             </div>
           </div>
           <div className="text-lg sm:text-2xl font-black text-zinc-900 font-mono">
-            {totalGreenStockKg.toLocaleString('id-ID')} <span className="text-[10px] sm:text-xs font-semibold text-zinc-500">kg</span>
+            {Math.round(totalGreenStockKg).toLocaleString('id-ID')} <span className="text-[10px] sm:text-xs font-semibold text-zinc-500">kg</span>
           </div>
           <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 sm:mt-1 flex items-center gap-1 truncate">
             <Box className="h-3 w-3 text-emerald-600 shrink-0" />
@@ -832,7 +832,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                             isLow ? 'text-rose-700' : 'text-zinc-900'
                           }`}
                         >
-                          {currentStock.toLocaleString('id-ID')}{' '}
+                          {Math.round(currentStock).toLocaleString('id-ID')}{' '}
                           <span className="text-xs font-normal text-zinc-500">kg</span>
                         </div>
                         <div className="text-[10px] text-zinc-400 font-mono">
@@ -1131,7 +1131,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     <option value="">-- Pilih Biji Kopi Master --</option>
                     {beans.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.variety} • {b.process}) - Sisa {b.stockGreenKg} kg
+                        {b.name} ({b.variety} • {b.process}) - Sisa {Math.round(b.stockGreenKg).toLocaleString('id-ID')} kg
                       </option>
                     ))}
                   </select>

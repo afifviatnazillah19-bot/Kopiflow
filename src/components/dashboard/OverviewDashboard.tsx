@@ -112,7 +112,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-zinc-900">
-              {totalGreenKg.toLocaleString('id-ID')}
+              {Math.round(totalGreenKg).toLocaleString('id-ID')}
             </span>
             <span className="text-xs font-medium text-zinc-500">kg (Kopi Beras)</span>
           </div>
@@ -137,7 +137,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-zinc-900">
-              {totalRoastedKg.toLocaleString('id-ID')}
+              {Math.round(totalRoastedKg).toLocaleString('id-ID')}
             </span>
             <span className="text-xs font-medium text-zinc-500">kg Siap Distribusi</span>
           </div>
