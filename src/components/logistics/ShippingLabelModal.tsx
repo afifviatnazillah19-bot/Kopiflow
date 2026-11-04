@@ -19,7 +19,7 @@ import {
   Edit2
 } from 'lucide-react';
 import { Shipment, Order } from '../../types/erp';
-import { formatIDR } from '../../services/dbService';
+import { formatIDR, subscribeToWarehouseHeads } from '../../services/dbService';
 import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
 
 interface ShippingLabelModalProps {
@@ -46,6 +46,19 @@ export const ShippingLabelModal: React.FC<ShippingLabelModalProps> = ({
   const [senderAddress, setSenderAddress] = useState(
     'Jl. Merdeka No. 88, Mon Geudong, Kota Lhokseumawe, Aceh (Kode Pos 24352)'
   );
+
+  // Sync sender info from real-time Firestore database
+  React.useEffect(() => {
+    const unsub = subscribeToWarehouseHeads((heads) => {
+      const primary = heads.find((h) => h.status === 'Primary') || heads[0];
+      if (primary) {
+        setSenderContact(`${primary.name} (Kepala Gudang)`);
+        if (primary.phone) setSenderPhone(primary.phone);
+        if (primary.hubLocation) setSenderName(primary.hubLocation.toUpperCase());
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Recipient (Penerima)
   const defaultRecipientName = shipment?.customerName || order?.customerName || 'Pelanggan Kopi';

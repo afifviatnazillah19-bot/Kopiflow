@@ -24,7 +24,9 @@ import {
   QrisPaymentConfig,
   BusinessNotificationConfig,
   OpenWaConfig,
-  WhatsAppProvider
+  WhatsAppProvider,
+  RoasterStaff,
+  WarehouseHead
 } from '../types/erp';
 import {
   ACEH_LOKET_PRESETS,
@@ -32,7 +34,9 @@ import {
   SAMPLE_BEANS,
   SAMPLE_BATCHES,
   SAMPLE_INBOUND,
-  SAMPLE_OUTBOUND
+  SAMPLE_OUTBOUND,
+  DEFAULT_ROASTER_STAFF,
+  DEFAULT_WAREHOUSE_HEAD
 } from '../data/initialData';
 
 export const COLLECTIONS = {
@@ -1070,6 +1074,125 @@ export function subscribeToQrisConfig(
     );
   } catch (err) {
     console.warn('Subscription init warning on QRIS config:', err);
+  }
+
+  return () => {
+    localUnsub();
+    if (firestoreUnsub) firestoreUnsub();
+  };
+}
+
+// -------------------------------------------------------------
+// MANAJEMEN DATA STAF ROASTER & KEPALA GUDANG (FIRESTORE SYNC)
+// -------------------------------------------------------------
+export function getWarehouseHeads(): WarehouseHead[] {
+  return getLocalCache<WarehouseHead[]>('warehouse_head', DEFAULT_WAREHOUSE_HEAD);
+}
+
+export async function saveWarehouseHeads(heads: WarehouseHead[]): Promise<void> {
+  setLocalCache('warehouse_head', heads);
+
+  try {
+    const payload = {
+      list: removeUndefined(heads),
+      updatedAt: new Date().toISOString()
+    };
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'), payload));
+    await syncToRTDB(COLLECTIONS.SETTINGS, 'warehouse_heads', payload);
+  } catch (error) {
+    console.warn('Notice saving warehouse heads to Firestore:', error);
+  }
+}
+
+export function subscribeToWarehouseHeads(
+  callback: (heads: WarehouseHead[]) => void
+): () => void {
+  const initial = getWarehouseHeads();
+  callback(initial);
+
+  const localUnsub = listenLocalCache<WarehouseHead[]>('warehouse_head', (data) => {
+    callback(data || DEFAULT_WAREHOUSE_HEAD);
+  });
+
+  let firestoreUnsub: (() => void) | null = null;
+  try {
+    firestoreUnsub = onSnapshot(
+      doc(db, COLLECTIONS.SETTINGS, 'warehouse_heads'),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const raw = snapshot.data();
+          const list = (raw.list || raw) as WarehouseHead[];
+          if (Array.isArray(list) && list.length > 0) {
+            setLocalCache('warehouse_head', list);
+            callback(list);
+          }
+        }
+      },
+      (error) => {
+        console.warn('Real-time listener notice on warehouse heads:', error?.message || error);
+        callback(getWarehouseHeads());
+      }
+    );
+  } catch (err) {
+    console.warn('Subscription init warning on warehouse heads:', err);
+  }
+
+  return () => {
+    localUnsub();
+    if (firestoreUnsub) firestoreUnsub();
+  };
+}
+
+export function getRoasterStaff(): RoasterStaff[] {
+  return getLocalCache<RoasterStaff[]>('roaster_staff', DEFAULT_ROASTER_STAFF);
+}
+
+export async function saveRoasterStaff(staff: RoasterStaff[]): Promise<void> {
+  setLocalCache('roaster_staff', staff);
+
+  try {
+    const payload = {
+      list: removeUndefined(staff),
+      updatedAt: new Date().toISOString()
+    };
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'), payload));
+    await syncToRTDB(COLLECTIONS.SETTINGS, 'roaster_staff', payload);
+  } catch (error) {
+    console.warn('Notice saving roaster staff to Firestore:', error);
+  }
+}
+
+export function subscribeToRoasterStaff(
+  callback: (staff: RoasterStaff[]) => void
+): () => void {
+  const initial = getRoasterStaff();
+  callback(initial);
+
+  const localUnsub = listenLocalCache<RoasterStaff[]>('roaster_staff', (data) => {
+    callback(data || DEFAULT_ROASTER_STAFF);
+  });
+
+  let firestoreUnsub: (() => void) | null = null;
+  try {
+    firestoreUnsub = onSnapshot(
+      doc(db, COLLECTIONS.SETTINGS, 'roaster_staff'),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const raw = snapshot.data();
+          const list = (raw.list || raw) as RoasterStaff[];
+          if (Array.isArray(list) && list.length > 0) {
+            setLocalCache('roaster_staff', list);
+            callback(list);
+          }
+        }
+      },
+      (error) => {
+        console.warn('Real-time listener notice on roaster staff:', error?.message || error);
+        callback(getRoasterStaff());
+      }
+    );
+  } catch (err) {
+    console.warn('Subscription init warning on roaster staff:', err);
   }
 
   return () => {

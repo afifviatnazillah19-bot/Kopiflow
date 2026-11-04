@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Trash2,
   AlertTriangle,
@@ -23,7 +23,8 @@ import {
   ShieldCheck,
   Edit2,
   BadgeCheck,
-  User
+  User,
+  Cloud
 } from 'lucide-react';
 import {
   CoffeeBean,
@@ -44,7 +45,13 @@ import {
   seedNeutralTestData,
   COLLECTIONS,
   getLocalCache,
-  setLocalCache
+  setLocalCache,
+  getWarehouseHeads,
+  saveWarehouseHeads,
+  subscribeToWarehouseHeads,
+  getRoasterStaff,
+  saveRoasterStaff,
+  subscribeToRoasterStaff
 } from '../../services/dbService';
 import { DEFAULT_ROASTER_STAFF, DEFAULT_WAREHOUSE_HEAD } from '../../data/initialData';
 
@@ -73,13 +80,23 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
 }) => {
   const [activeSettingTab, setActiveSettingTab] = useState<'staff' | 'database'>('staff');
 
-  // Staff States (Roasters & Kepala Gudang)
-  const [roasters, setRoasters] = useState<RoasterStaff[]>(() =>
-    getLocalCache('roaster_staff', DEFAULT_ROASTER_STAFF)
-  );
-  const [warehouseHeadList, setWarehouseHeadList] = useState<WarehouseHead[]>(() =>
-    getLocalCache('warehouse_head', DEFAULT_WAREHOUSE_HEAD)
-  );
+  // Staff States (Roasters & Kepala Gudang) - Synced with Firestore
+  const [roasters, setRoasters] = useState<RoasterStaff[]>(getRoasterStaff);
+  const [warehouseHeadList, setWarehouseHeadList] = useState<WarehouseHead[]>(getWarehouseHeads);
+
+  // Real-time Firestore synchronization listeners
+  useEffect(() => {
+    const unsubWh = subscribeToWarehouseHeads((heads) => {
+      setWarehouseHeadList(heads);
+    });
+    const unsubRst = subscribeToRoasterStaff((staff) => {
+      setRoasters(staff);
+    });
+    return () => {
+      unsubWh();
+      unsubRst();
+    };
+  }, []);
 
   // Roaster Modal
   const [isRoasterModalOpen, setIsRoasterModalOpen] = useState(false);
@@ -102,17 +119,43 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
   const [whShift, setWhShift] = useState<WarehouseHead['shift']>('Full Time');
   const [whRespStr, setWhRespStr] = useState('QC Kadar Air, Dispatch Grab & Loket, Stok Opname');
 
-  const saveRoastersToCache = (data: RoasterStaff[]) => {
+  const saveRoastersToDatabase = async (data: RoasterStaff[]) => {
     setRoasters(data);
-    setLocalCache('roaster_staff', data);
+    await saveRoasterStaff(data);
   };
 
-  const saveWhHeadToCache = (data: WarehouseHead[]) => {
+  const saveWhHeadToDatabase = async (data: WarehouseHead[]) => {
     setWarehouseHeadList(data);
-    setLocalCache('warehouse_head', data);
+    await saveWarehouseHeads(data);
   };
 
-  const handleSaveRoaster = (e: React.FormEvent) => {
+  const handleDeleteRoaster = async (id: string) => {
+    const target = roasters.find((r) => r.id === id);
+    if (!target) return;
+    const updated = roasters.filter((r) => r.id !== id);
+    await saveRoastersToDatabase(updated);
+    showNotification(`Roaster "${target.name}" berhasil dihapus dari database Firestore.`);
+  };
+
+  const handleDeleteWhHead = async (id: string) => {
+    const target = warehouseHeadList.find((w) => w.id === id);
+    if (!target) return;
+    const updated = warehouseHeadList.filter((w) => w.id !== id);
+    await saveWhHeadToDatabase(updated);
+    showNotification(`Kepala Gudang "${target.name}" berhasil dihapus dari database Firestore.`);
+  };
+
+  const handleSetPrimaryWhHead = async (id: string) => {
+    const updated = warehouseHeadList.map((w) => ({
+      ...w,
+      status: (w.id === id ? 'Primary' : 'Active') as WarehouseHead['status']
+    }));
+    await saveWhHeadToDatabase(updated);
+    const target = updated.find((w) => w.id === id);
+    showNotification(`"${target?.name}" dijadikan Kepala Gudang Utama.`);
+  };
+
+  const handleSaveRoaster = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRoaster) {
       const updated = roasters.map((item: RoasterStaff) =>
@@ -129,8 +172,8 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
             }
           : item
       );
-      saveRoastersToCache(updated);
-      showNotification(`Data Roaster "${rName}" berhasil diperbarui.`);
+      await saveRoastersToDatabase(updated);
+      showNotification(`Data Roaster "${rName}" tersimpan di database Firestore.`);
     } else {
       const newRoaster: RoasterStaff = {
         id: `rst-${Date.now()}`,
@@ -143,13 +186,13 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
         status: rStatus,
         createdAt: new Date().toISOString()
       };
-      saveRoastersToCache([...roasters, newRoaster]);
-      showNotification(`Roaster baru "${rName}" berhasil ditambahkan.`);
+      await saveRoastersToDatabase([...roasters, newRoaster]);
+      showNotification(`Roaster baru "${rName}" berhasil tersimpan ke database.`);
     }
     setIsRoasterModalOpen(false);
   };
 
-  const handleSaveWhHead = (e: React.FormEvent) => {
+  const handleSaveWhHead = async (e: React.FormEvent) => {
     e.preventDefault();
     const respArr = whRespStr
       .split(',')
@@ -170,8 +213,8 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
             }
           : item
       );
-      saveWhHeadToCache(updated);
-      showNotification(`Data Kepala Gudang "${whName}" berhasil diperbarui.`);
+      await saveWhHeadToDatabase(updated);
+      showNotification(`Data Kepala Gudang "${whName}" tersimpan di database Firestore.`);
     } else {
       const newHead: WarehouseHead = {
         id: `whh-${Date.now()}`,
@@ -181,11 +224,11 @@ export const DataSettingsManager: React.FC<DataSettingsManagerProps> = ({
         hubLocation: whHub,
         shift: whShift,
         responsibilities: respArr,
-        status: 'Primary',
+        status: warehouseHeadList.length === 0 ? 'Primary' : 'Active',
         createdAt: new Date().toISOString()
       };
-      saveWhHeadToCache([...warehouseHeadList, newHead]);
-      showNotification(`Kepala Gudang baru "${whName}" berhasil ditambahkan.`);
+      await saveWhHeadToDatabase([...warehouseHeadList, newHead]);
+      showNotification(`Kepala Gudang baru "${whName}" berhasil disimpan ke database.`);
     }
     setIsWhHeadModalOpen(false);
   };
@@ -410,9 +453,15 @@ service cloud.firestore {
                   <Building2 className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-zinc-900">
-                    Data Kepala Gudang & QC (Kofiara Hub Lhokseumawe)
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-bold text-zinc-900">
+                      Data Kepala Gudang & QC (Kofiara Hub Lhokseumawe)
+                    </h3>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 border border-emerald-200">
+                      <Cloud className="h-3 w-3" />
+                      Tersimpan di Database Firestore
+                    </span>
+                  </div>
                   <p className="text-xs text-zinc-500">
                     Penanggung jawab operasional penerimaan green bean, pengiriman loket/Grab, dan QC gudang
                   </p>
@@ -455,12 +504,16 @@ service cloud.firestore {
                   key={wh.id}
                   className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-3"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-sm text-zinc-950">{wh.name}</span>
-                        <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5">
-                          {wh.status}
+                        <span className={`rounded text-[10px] font-bold px-2 py-0.5 ${
+                          wh.status === 'Primary'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-zinc-200 text-zinc-700'
+                        }`}>
+                          {wh.status === 'Primary' ? '★ Kepala Gudang Utama' : wh.status}
                         </span>
                       </div>
                       <p className="text-xs text-amber-900 font-medium mt-0.5">
@@ -468,22 +521,44 @@ service cloud.firestore {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setEditingWhHead(wh);
-                        setWhName(wh.name);
-                        setWhPhone(wh.phone);
-                        setWhNik(wh.nikStaff);
-                        setWhHub(wh.hubLocation);
-                        setWhShift(wh.shift);
-                        setWhRespStr(wh.responsibilities.join(', '));
-                        setIsWhHeadModalOpen(true);
-                      }}
-                      className="text-amber-800 hover:text-amber-950 p-1 text-xs font-bold flex items-center gap-1"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                      <span>Edit</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {wh.status !== 'Primary' && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetPrimaryWhHead(wh.id)}
+                          className="text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-1 rounded-md"
+                          title="Jadikan sebagai penanggung jawab utama surat jalan & label kirim"
+                        >
+                          Set Utama
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditingWhHead(wh);
+                          setWhName(wh.name);
+                          setWhPhone(wh.phone);
+                          setWhNik(wh.nikStaff);
+                          setWhHub(wh.hubLocation);
+                          setWhShift(wh.shift);
+                          setWhRespStr(wh.responsibilities.join(', '));
+                          setIsWhHeadModalOpen(true);
+                        }}
+                        className="text-amber-800 hover:text-amber-950 p-1 text-xs font-bold flex items-center gap-1 border border-amber-300 rounded-md bg-white hover:bg-amber-50"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      {warehouseHeadList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteWhHead(wh.id)}
+                          className="text-rose-700 hover:text-rose-900 p-1 text-xs font-bold flex items-center gap-1 border border-rose-200 rounded-md bg-white hover:bg-rose-50"
+                          title="Hapus data kepala gudang ini dari database"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="text-xs space-y-1 text-zinc-700 bg-white p-3 rounded-lg border border-amber-200/80">
@@ -525,9 +600,15 @@ service cloud.firestore {
                   <Flame className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-zinc-900">
-                    Data Staff Roaster & Penyangrai Kopi
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-bold text-zinc-900">
+                      Data Staff Roaster & Penyangrai Kopi
+                    </h3>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 text-orange-900 text-[10px] font-bold px-2.5 py-0.5 border border-orange-200">
+                      <Cloud className="h-3 w-3" />
+                      Tersimpan di Database Firestore
+                    </span>
+                  </div>
                   <p className="text-xs text-zinc-500">
                     Profil tim roaster, sertifikasi SCA, dan spesialisasi mesin sangrai rakitan / komersial
                   </p>
@@ -560,7 +641,7 @@ service cloud.firestore {
                   key={r.id}
                   className="rounded-xl border border-orange-200 bg-orange-50/30 p-4 space-y-3"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-sm text-zinc-950">{r.name}</span>
@@ -573,23 +654,35 @@ service cloud.firestore {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setEditingRoaster(r);
-                        setRName(r.name);
-                        setRPhone(r.phone);
-                        setRRole(r.role);
-                        setRCert(r.certification || '');
-                        setRMachine(r.machineSpecialty || '');
-                        setRShift(r.shift);
-                        setRStatus(r.status);
-                        setIsRoasterModalOpen(true);
-                      }}
-                      className="text-orange-800 hover:text-orange-950 p-1 text-xs font-bold flex items-center gap-1"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                      <span>Edit</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingRoaster(r);
+                          setRName(r.name);
+                          setRPhone(r.phone);
+                          setRRole(r.role);
+                          setRCert(r.certification || '');
+                          setRMachine(r.machineSpecialty || '');
+                          setRShift(r.shift);
+                          setRStatus(r.status);
+                          setIsRoasterModalOpen(true);
+                        }}
+                        className="text-orange-800 hover:text-orange-950 p-1 text-xs font-bold flex items-center gap-1 border border-orange-300 rounded-md bg-white hover:bg-orange-50"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      {roasters.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRoaster(r.id)}
+                          className="text-rose-700 hover:text-rose-900 p-1 text-xs font-bold flex items-center gap-1 border border-rose-200 rounded-md bg-white hover:bg-rose-50"
+                          title="Hapus roaster ini dari database"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="text-xs space-y-1 bg-white p-3 rounded-lg border border-orange-200/80">
