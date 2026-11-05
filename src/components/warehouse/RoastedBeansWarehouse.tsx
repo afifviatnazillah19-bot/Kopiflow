@@ -215,7 +215,7 @@ export const RoastedBeansWarehouse: React.FC<RoastedBeansWarehouseProps> = ({
             </div>
           </div>
           <div className="text-2xl font-black text-zinc-900 font-mono">
-            {totalRoastedKg.toLocaleString('id-ID')} <span className="text-xs font-semibold text-zinc-500">kg</span>
+            {Number(totalRoastedKg.toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} <span className="text-xs font-semibold text-zinc-500">kg</span>
           </div>
           <p className="text-[11px] text-zinc-500 mt-1">Siap dikemas & dikirim ke kedai</p>
         </div>
@@ -398,7 +398,7 @@ export const RoastedBeansWarehouse: React.FC<RoastedBeansWarehouseProps> = ({
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="font-mono text-sm font-bold text-zinc-900">
-                          {beanStock.toLocaleString('id-ID')} <span className="text-xs font-normal text-zinc-500">kg</span>
+                          {Number((beanStock || 0).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} <span className="text-xs font-normal text-zinc-500">kg</span>
                         </div>
                         <div className="text-[10px] text-zinc-500 font-mono">
                           {beanStock > 0 ? 'Tersedia Siap Jual' : 'Habis / Perlu Sangrai'}
@@ -474,10 +474,11 @@ export const RoastedBeansWarehouse: React.FC<RoastedBeansWarehouseProps> = ({
                 <input
                   type="number"
                   min="0"
-                  step="0.1"
+                  step="any"
                   required
-                  value={editRoastedStock}
-                  onChange={(e) => setEditRoastedStock(Number(e.target.value))}
+                  value={editRoastedStock === 0 || (editRoastedStock as any) === '' ? '' : editRoastedStock}
+                  onChange={(e) => setEditRoastedStock(e.target.value === '' ? 0 : Number(e.target.value))}
+                  placeholder="0.00"
                   className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono font-bold text-sm focus:border-amber-600 focus:outline-hidden"
                 />
                 <p className="text-[10px] text-zinc-500 mt-1">

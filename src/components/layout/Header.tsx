@@ -18,7 +18,8 @@ import {
   ChevronRight,
   ShieldCheck,
   CheckCircle2,
-  Gauge
+  Gauge,
+  FileText
 } from 'lucide-react';
 
 
@@ -65,18 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeShipmentsCount = 0,
   partnersCount = 0
 }) => {
-  const activeTabRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    if (activeTabRef.current) {
-      activeTabRef.current.scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest'
-      });
-    }
-  }, [currentTab]);
-
   // Navigation tabs definition for the modern top bar
   const navTabs = [
 
@@ -135,6 +124,13 @@ export const Header: React.FC<HeaderProps> = ({
       badge: null
     },
     {
+      id: 'invoice' as NavTab,
+      label: 'Faktur & Cetak PDF',
+      icon: FileText,
+      badge: 'Template A4',
+      badgeColor: 'bg-amber-600/20 text-amber-800'
+    },
+    {
       id: 'relations' as NavTab,
       label: 'Relasi Mitra',
       icon: Users,
@@ -191,6 +187,11 @@ export const Header: React.FC<HeaderProps> = ({
         return {
           title: 'Manajemen Pesanan & Kasir',
           subtitle: 'Pembuatan pesanan berbasis tier harga, faktur resmi, dan barcode pembayaran QRIS GoPay'
+        };
+      case 'invoice':
+        return {
+          title: 'Faktur Penjualan & Template PDF Ekspor',
+          subtitle: 'Kustomisasi layout faktur, isi item produk kopi, dan unduh dokumen siap cetak A4 instan'
         };
       case 'relations':
         return {
@@ -326,7 +327,6 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={tab.id}
-                ref={isActive ? activeTabRef : null}
                 onClick={() => onSelectTab(tab.id)}
                 className={`group relative flex items-center gap-1.5 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-all duration-150 shrink-0 ${
                   isActive

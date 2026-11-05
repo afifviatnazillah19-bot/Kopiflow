@@ -512,6 +512,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                       <input
                         type="number"
                         min="0"
+                        step="any"
                         value={targetActualGreen}
                         onChange={(e) => setTargetActualGreen(Number(e.target.value))}
                         className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-900 focus:border-amber-500 focus:outline-hidden"
@@ -521,7 +522,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                     <span className="text-[11px] text-zinc-400">
                       Selisih:{' '}
                       {targetActualGreen - selectedBeanForOpname.stockGreenKg >= 0 ? '+' : ''}
-                      {targetActualGreen - selectedBeanForOpname.stockGreenKg} kg
+                      {Number((targetActualGreen - selectedBeanForOpname.stockGreenKg).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
                     </span>
                   </div>
 
@@ -533,6 +534,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                       <input
                         type="number"
                         min="0"
+                        step="any"
                         value={targetActualRoasted}
                         onChange={(e) => setTargetActualRoasted(Number(e.target.value))}
                         className="w-full rounded-lg border border-orange-200 bg-orange-50/30 px-3 py-1.5 text-xs text-orange-950 font-bold focus:border-orange-500 focus:outline-hidden"
@@ -542,7 +544,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                     <span className="text-[11px] text-zinc-400">
                       Selisih:{' '}
                       {targetActualRoasted - selectedBeanForOpname.stockRoastedKg >= 0 ? '+' : ''}
-                      {targetActualRoasted - selectedBeanForOpname.stockRoastedKg} kg
+                      {Number((targetActualRoasted - selectedBeanForOpname.stockRoastedKg).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
                     </span>
                   </div>
                 </div>
@@ -775,6 +777,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                     <input
                       type="number"
                       min="0"
+                      step="any"
                       value={newBean.stockGreenKg ?? 0}
                       onChange={(e) => setNewBean({ ...newBean, stockGreenKg: Number(e.target.value) })}
                       className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-1.5 focus:border-amber-500 focus:outline-hidden"
@@ -787,6 +790,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ beans, onRef
                     <input
                       type="number"
                       min="0"
+                      step="any"
                       value={newBean.stockRoastedKg ?? 0}
                       onChange={(e) => setNewBean({ ...newBean, stockRoastedKg: Number(e.target.value) })}
                       className="w-full rounded-lg border border-orange-300 bg-orange-50/50 px-3 py-1.5 focus:border-orange-500 focus:outline-hidden font-bold text-orange-950"

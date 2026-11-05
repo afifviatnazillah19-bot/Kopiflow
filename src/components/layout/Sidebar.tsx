@@ -27,6 +27,7 @@ export type NavTab =
   | 'finance'
   | 'logistics'
   | 'orders'
+  | 'invoice'
   | 'relations'
   | 'movements'
   | 'inventory'

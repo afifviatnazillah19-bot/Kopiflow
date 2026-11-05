@@ -100,7 +100,7 @@ export function setLocalCache<T>(key: string, data: T): void {
 }
 
 // Safe Firestore write helper that never hangs if offline or slow
-export async function safeFirestoreWrite(promise: Promise<any>, timeoutMs: number = 1200): Promise<void> {
+export async function safeFirestoreWrite(promise: Promise<any>, timeoutMs: number = 5000): Promise<void> {
   let timeoutId: any;
   const timeoutPromise = new Promise<void>((resolve) => {
     timeoutId = setTimeout(() => {
@@ -518,8 +518,8 @@ export async function updateBeanStock(
   const bean = currentBeans.find((b) => b.id === beanId);
   if (!bean) return;
 
-  const newGreen = Math.max(0, Math.round(bean.stockGreenKg + stockGreenDelta));
-  const newRoasted = Math.max(0, Math.round(bean.stockRoastedKg + stockRoastedDelta));
+  const newGreen = Math.max(0, Number((bean.stockGreenKg + stockGreenDelta).toFixed(2)));
+  const newRoasted = Math.max(0, Number((bean.stockRoastedKg + stockRoastedDelta).toFixed(2)));
   const updatedBean = {
     ...bean,
     stockGreenKg: newGreen,
@@ -538,7 +538,7 @@ export async function updateBeanStock(
       stockRoastedKg: newRoasted,
       updatedAt: new Date().toISOString()
     };
-    await updateDoc(doc(db, COLLECTIONS.BEANS, beanId), updateData);
+    await safeFirestoreWrite(updateDoc(doc(db, COLLECTIONS.BEANS, beanId), updateData));
     await syncToRTDB(COLLECTIONS.BEANS, beanId, { ...bean, ...updateData });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
@@ -761,7 +761,7 @@ export async function saveRoastLog(
     if (roastLog.batchLotNumber) {
       const batch = batchesList.find((b) => b.lotNumber === roastLog.batchLotNumber);
       if (batch) {
-        const newQty = Math.max(0, batch.quantityRemainingKg - greenKg);
+        const newQty = Math.max(0, Number((batch.quantityRemainingKg - greenKg).toFixed(2)));
         const updatedBatch = {
           ...batch,
           quantityRemainingKg: newQty,

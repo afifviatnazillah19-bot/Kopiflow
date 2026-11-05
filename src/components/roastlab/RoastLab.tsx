@@ -697,7 +697,7 @@ export const RoastLab: React.FC<RoastLabProps> = ({
                   >
                     {batches.map((b) => (
                       <option key={b.id} value={b.lotNumber}>
-                        {b.lotNumber} ({b.beanName}) - Sisa {Math.round(b.quantityRemainingKg).toLocaleString('id-ID')} kg
+                        {b.lotNumber} ({b.beanName}) - Sisa {Number((b.quantityRemainingKg || 0).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
                       </option>
                     ))}
                   </select>

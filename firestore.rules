@@ -66,9 +66,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Default deny for unlisted documents
+    // Allow read, write on all documents and subcollections
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

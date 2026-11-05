@@ -16,6 +16,7 @@ import { PartnerManager } from './components/relations/PartnerManager';
 import { MovementsManager } from './components/movements/MovementsManager';
 import { PricingMatrix } from './components/pricing/PricingMatrix';
 import { OrderManager } from './components/orders/OrderManager';
+import { InvoiceGenerator } from './components/orders/InvoiceGenerator';
 import { RoastLab } from './components/roastlab/RoastLab';
 import { ShipmentTracker } from './components/logistics/ShipmentTracker';
 import { NotificationCenter } from './components/notifications/NotificationCenter';
@@ -135,7 +136,7 @@ export default function App() {
   ).length;
 
   return (
-    <div className="flex flex-col h-screen h-[100dvh] w-full bg-zinc-100 font-sans text-zinc-900 antialiased overflow-hidden overscroll-none">
+    <div className="flex flex-col h-full h-screen w-full bg-zinc-100 font-sans text-zinc-900 antialiased overflow-hidden overscroll-none">
       {/* Top Header with Modern Top Navigation */}
       <Header
         currentTab={currentTab}
@@ -266,6 +267,14 @@ export default function App() {
 
             {currentTab === 'orders' && (
               <OrderManager orders={orders} beans={beans} partners={partners} onRefresh={handleManualRefresh} />
+            )}
+
+            {currentTab === 'invoice' && (
+              <InvoiceGenerator
+                orders={orders}
+                beans={beans}
+                onRefresh={handleManualRefresh}
+              />
             )}
 
             {currentTab === 'roastlab' && (

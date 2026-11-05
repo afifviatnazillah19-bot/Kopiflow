@@ -621,9 +621,11 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
                   <input
                     type="number"
                     required
-                    min="1"
-                    value={inbWeightKg}
-                    onChange={(e) => setInbWeightKg(Number(e.target.value))}
+                    min="0.01"
+                    step="any"
+                    value={inbWeightKg === 0 || (inbWeightKg as any) === '' ? '' : inbWeightKg}
+                    onChange={(e) => setInbWeightKg(e.target.value === '' ? 0 : Number(e.target.value))}
+                    placeholder="0.00"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono font-bold text-zinc-900 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
@@ -800,9 +802,11 @@ export const MovementsManager: React.FC<MovementsManagerProps> = ({
                   <input
                     type="number"
                     required
-                    min="1"
-                    value={outQuantityKg}
-                    onChange={(e) => setOutQuantityKg(Number(e.target.value))}
+                    min="0.01"
+                    step="any"
+                    value={outQuantityKg === 0 || (outQuantityKg as any) === '' ? '' : outQuantityKg}
+                    onChange={(e) => setOutQuantityKg(e.target.value === '' ? 0 : Number(e.target.value))}
+                    placeholder="0.00"
                     className="w-full rounded-lg border border-zinc-200 px-3 py-1.5 font-mono font-bold text-zinc-900 focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>

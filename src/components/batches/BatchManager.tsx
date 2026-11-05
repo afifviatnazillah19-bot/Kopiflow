@@ -609,7 +609,8 @@ export const BatchManager: React.FC<BatchManagerProps> = ({
                   <label className="block font-semibold text-zinc-700 mb-1">Berat Per Karung (kg)</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0.01"
+                    step="any"
                     value={bagWeightKg === 0 || bagWeightKg === '' ? '' : bagWeightKg}
                     onChange={(e) => setBagWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
                     placeholder="0"

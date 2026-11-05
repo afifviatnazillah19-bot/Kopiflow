@@ -130,16 +130,18 @@ export const FinanceAndPricing: React.FC<FinanceAndPricingProps> = ({
   const [isSavingHpp, setIsSavingHpp] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
-  // Sync state when selected bean changes
+  // Sync state when selected bean changes (only re-populate when selectedBeanId changes)
+  const prevSelectedIdRef = useRef<string>(selectedBeanId);
   useEffect(() => {
-    if (currentBean) {
-      setCostGreen(currentBean.costGreenPerKg || 90000);
-      setCostRoast(currentBean.costRoastingPerKg || 15000);
-      setCostPack(currentBean.costPackagingPerKg || 8000);
-      setCostOverhead(currentBean.costOverheadPerKg || 7000);
-      setPriceLocal(currentBean.priceLocalPerKg || 145000);
-      setPriceUmkm(currentBean.priceUmkmPerKg || 135000);
-      setPriceLuarPulau(currentBean.priceLuarPulauPerKg || 165000);
+    if (currentBean && prevSelectedIdRef.current !== selectedBeanId) {
+      prevSelectedIdRef.current = selectedBeanId;
+      setCostGreen(currentBean.costGreenPerKg ?? 90000);
+      setCostRoast(currentBean.costRoastingPerKg ?? 15000);
+      setCostPack(currentBean.costPackagingPerKg ?? 8000);
+      setCostOverhead(currentBean.costOverheadPerKg ?? 7000);
+      setPriceLocal(currentBean.priceLocalPerKg ?? 145000);
+      setPriceUmkm(currentBean.priceUmkmPerKg ?? 135000);
+      setPriceLuarPulau(currentBean.priceLuarPulauPerKg ?? 165000);
     }
   }, [selectedBeanId, currentBean]);
 

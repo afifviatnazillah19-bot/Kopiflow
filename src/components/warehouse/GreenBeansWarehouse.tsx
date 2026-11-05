@@ -534,7 +534,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
             </div>
           </div>
           <div className="text-lg sm:text-2xl font-black text-zinc-900 font-mono">
-            {Math.round(totalGreenStockKg).toLocaleString('id-ID')} <span className="text-[10px] sm:text-xs font-semibold text-zinc-500">kg</span>
+            {Number(totalGreenStockKg.toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} <span className="text-[10px] sm:text-xs font-semibold text-zinc-500">kg</span>
           </div>
           <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 sm:mt-1 flex items-center gap-1 truncate">
             <Box className="h-3 w-3 text-emerald-600 shrink-0" />
@@ -666,10 +666,10 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   <span className="font-bold text-zinc-900">{b.name}</span>
                   <span className="text-zinc-400">|</span>
                   <span className="font-mono text-rose-700 font-bold">
-                    Sisa: {b.stockGreenKg} kg
+                    Sisa: {Number((b.stockGreenKg || 0).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
                   </span>
                   <span className="text-[10px] text-zinc-500">
-                    (Min: {b.minAlertKg} kg, Defisit: -{deficit} kg)
+                    (Min: {b.minAlertKg} kg, Defisit: -{Number(deficit.toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg)
                   </span>
                   <button
                     onClick={() => setAlertDispatchModalBean(b)}
@@ -832,7 +832,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                             isLow ? 'text-rose-700' : 'text-zinc-900'
                           }`}
                         >
-                          {Math.round(currentStock).toLocaleString('id-ID')}{' '}
+                          {Number((currentStock || 0).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })}{' '}
                           <span className="text-xs font-normal text-zinc-500">kg</span>
                         </div>
                         <div className="text-[10px] text-zinc-400 font-mono">
@@ -1131,7 +1131,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                     <option value="">-- Pilih Biji Kopi Master --</option>
                     {beans.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.name} ({b.variety} • {b.process}) - Sisa {Math.round(b.stockGreenKg).toLocaleString('id-ID')} kg
+                        {b.name} ({b.variety} • {b.process}) - Sisa {Number((b.stockGreenKg || 0).toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
                       </option>
                     ))}
                   </select>
@@ -1680,6 +1680,7 @@ export const GreenBeansWarehouse: React.FC<GreenBeansWarehouseProps> = ({
                   <input
                     type="number"
                     min="0"
+                    step="any"
                     value={editGreenStock === 0 || editGreenStock === '' ? '' : editGreenStock}
                     onChange={(e) => setEditGreenStock(e.target.value === '' ? '' : Number(e.target.value))}
                     placeholder="0"

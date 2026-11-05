@@ -19,10 +19,13 @@ import {
   Package,
   MapPin,
   Truck,
-  Calendar
+  Calendar,
+  Download
 } from 'lucide-react';
 import { ShippingLabelModal } from '../logistics/ShippingLabelModal';
 import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
   Order,
   OrderItem,
@@ -67,11 +70,45 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
   const [selectedOrderForLabel, setSelectedOrderForLabel] = useState<Order | null>(null);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [qrisConfig, setQrisConfig] = useState<QrisPaymentConfig>(DEFAULT_QRIS_CONFIG);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const invoiceModalRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     const unsub = subscribeToQrisConfig(setQrisConfig);
     return () => unsub();
   }, []);
+
+  const handleExportOrderInvoicePdf = async (order: Order) => {
+    if (!invoiceModalRef.current) {
+      window.print();
+      return;
+    }
+    setIsExportingPdf(true);
+    try {
+      const element = invoiceModalRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2.2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`FAKTUR_${order.invoiceNumber.replace(/[\/\\:]/g, '_')}_${order.customerName.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+      console.error('Invoice PDF Export Error:', err);
+      window.print();
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // New Order Form state
   const [selectedPartnerId, setSelectedPartnerId] = useState('');
@@ -504,7 +541,7 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
             </div>
 
             {/* Document Body */}
-            <div className="mt-4 p-6 border border-zinc-200 rounded-xl bg-white text-zinc-900 font-sans">
+            <div ref={invoiceModalRef} className="mt-4 p-6 border border-zinc-200 rounded-xl bg-white text-zinc-900 font-sans">
               <div className="flex justify-between items-start border-b border-zinc-200 pb-4">
                 <div>
                   <div className="font-extrabold text-base tracking-wider text-amber-900">
@@ -714,6 +751,15 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
                   className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50"
                 >
                   Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportOrderInvoicePdf(selectedOrderForInvoice)}
+                  disabled={isExportingPdf}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-800 shadow-2xs"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{isExportingPdf ? 'Merender...' : 'Ekspor PDF'}</span>
                 </button>
                 <button
                   onClick={() => window.print()}
