@@ -6,6 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { NavTab } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
+import { MobileBottomNav } from './components/layout/MobileBottomNav';
+import { MobileMenuDrawer } from './components/layout/MobileMenuDrawer';
 import { OverviewDashboard } from './components/dashboard/OverviewDashboard';
 import { InventoryManager } from './components/inventory/InventoryManager';
 import { GreenBeansWarehouse } from './components/warehouse/GreenBeansWarehouse';
@@ -17,6 +19,7 @@ import { MovementsManager } from './components/movements/MovementsManager';
 import { PricingMatrix } from './components/pricing/PricingMatrix';
 import { OrderManager } from './components/orders/OrderManager';
 import { InvoiceGenerator } from './components/orders/InvoiceGenerator';
+import { BankingManager } from './components/banking/BankingManager';
 import { RoastLab } from './components/roastlab/RoastLab';
 import { ShipmentTracker } from './components/logistics/ShipmentTracker';
 import { NotificationCenter } from './components/notifications/NotificationCenter';
@@ -33,7 +36,9 @@ import {
   NotificationLog,
   Partner,
   InboundMovement,
-  OutboundMovement
+  OutboundMovement,
+  BankingPocket,
+  BankingTransaction
 } from './types/erp';
 import {
   NEUTRAL_EMPTY_BEANS,
@@ -44,7 +49,9 @@ import {
   NEUTRAL_EMPTY_NOTIFICATIONS,
   NEUTRAL_EMPTY_PARTNERS,
   NEUTRAL_EMPTY_INBOUND,
-  NEUTRAL_EMPTY_OUTBOUND
+  NEUTRAL_EMPTY_OUTBOUND,
+  DEFAULT_BANKING_POCKETS,
+  DEFAULT_BANKING_TRANSACTIONS
 } from './data/initialData';
 import {
   subscribeToBeans,
@@ -57,7 +64,9 @@ import {
   subscribeToInbound,
   subscribeToOutbound,
   subscribeToRoasterStaff,
-  subscribeToWarehouseHeads
+  subscribeToWarehouseHeads,
+  subscribeToBankingPockets,
+  subscribeToBankingTransactions
 } from './services/dbService';
 import { testFirestoreConnection } from './firebase/config';
 
@@ -67,6 +76,7 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const [triggerNewRoastModal, setTriggerNewRoastModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Real-time Database State (Initialized to neutral empty state)
   const [beans, setBeans] = useState<CoffeeBean[]>(NEUTRAL_EMPTY_BEANS);
@@ -78,6 +88,8 @@ export default function App() {
   const [partners, setPartners] = useState<Partner[]>(NEUTRAL_EMPTY_PARTNERS);
   const [inbound, setInbound] = useState<InboundMovement[]>(NEUTRAL_EMPTY_INBOUND);
   const [outbound, setOutbound] = useState<OutboundMovement[]>(NEUTRAL_EMPTY_OUTBOUND);
+  const [bankingPockets, setBankingPockets] = useState<BankingPocket[]>(DEFAULT_BANKING_POCKETS);
+  const [bankingTransactions, setBankingTransactions] = useState<BankingTransaction[]>(DEFAULT_BANKING_TRANSACTIONS);
 
   // Initialize Firestore listeners on mount
   useEffect(() => {
@@ -99,6 +111,8 @@ export default function App() {
       const unsubOut = subscribeToOutbound(setOutbound, NEUTRAL_EMPTY_OUTBOUND);
       const unsubRst = subscribeToRoasterStaff(() => {});
       const unsubWh = subscribeToWarehouseHeads(() => {});
+      const unsubPockets = subscribeToBankingPockets(setBankingPockets, DEFAULT_BANKING_POCKETS);
+      const unsubTxs = subscribeToBankingTransactions(setBankingTransactions, DEFAULT_BANKING_TRANSACTIONS);
 
       unsubs = [
         unsubBeans,
@@ -111,7 +125,9 @@ export default function App() {
         unsubInb,
         unsubOut,
         unsubRst,
-        unsubWh
+        unsubWh,
+        unsubPockets,
+        unsubTxs
       ];
       setIsSyncing(false);
     };
@@ -141,6 +157,7 @@ export default function App() {
       <Header
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
+        onOpenMenuDrawer={() => setIsMobileMenuOpen(true)}
         onOpenNewBatchModal={() => setCurrentTab('batches')}
         onOpenNewRoastModal={() => {
           setCurrentTab('roastlab');
@@ -161,9 +178,9 @@ export default function App() {
         partnersCount={partners.length}
       />
 
-      {/* Scrollable Viewport Container with overscroll containment */}
+      {/* Scrollable Viewport Container with overscroll containment and mobile bottom padding */}
       <main
-        className="flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-4 md:p-6 lg:p-8 touch-pan-y"
+        className="flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-4 md:p-6 lg:p-8 pb-24 sm:pb-8 touch-pan-y"
         style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
       >
           <div className="mx-auto max-w-7xl">
@@ -224,6 +241,18 @@ export default function App() {
                 onRefresh={handleManualRefresh}
                 onNavigateToShipping={() => setCurrentTab('logistics')}
                 onNavigateToOrders={() => setCurrentTab('orders')}
+              />
+            )}
+
+            {currentTab === 'banking' && (
+              <BankingManager
+                pockets={bankingPockets}
+                transactions={bankingTransactions}
+                orders={orders}
+                beans={beans}
+                inbound={inbound}
+                onRefresh={handleManualRefresh}
+                isSyncing={isSyncing}
               />
             )}
 
@@ -331,6 +360,27 @@ export default function App() {
         onSelectBatch={(batch) => {
           setCurrentTab('batches');
         }}
+      />
+
+      {/* Mobile Bottom Navigation Bar (Fixed for Smartphones) */}
+      <MobileBottomNav
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        onOpenMenuDrawer={() => setIsMobileMenuOpen(true)}
+        lowStockCount={lowStockCount}
+        activeShipmentsCount={activeShipmentsCount}
+      />
+
+      {/* Mobile Menu Full Drawer (Slide-up Sheet) */}
+      <MobileMenuDrawer
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        onOpenScanner={() => setIsScannerModalOpen(true)}
+        lowStockCount={lowStockCount}
+        activeShipmentsCount={activeShipmentsCount}
+        partnersCount={partners.length}
       />
     </div>
   );

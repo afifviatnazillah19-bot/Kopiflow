@@ -24,8 +24,7 @@ import {
 } from 'lucide-react';
 import { ShippingLabelModal } from '../logistics/ShippingLabelModal';
 import { SPECIFIC_DESTINATION_PRESETS, DestinationPreset } from '../../data/indonesiaRegions';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { exportElementToA4Pdf } from '../../utils/pdfExport';
 import {
   Order,
   OrderItem,
@@ -85,23 +84,8 @@ export const OrderManager: React.FC<OrderManagerProps> = ({
     }
     setIsExportingPdf(true);
     try {
-      const element = invoiceModalRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2.2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`FAKTUR_${order.invoiceNumber.replace(/[\/\\:]/g, '_')}_${order.customerName.replace(/\s+/g, '_')}.pdf`);
+      const filename = `FAKTUR_${order.invoiceNumber.replace(/[\/\\:]/g, '_')}_${order.customerName.replace(/\s+/g, '_')}.pdf`;
+      await exportElementToA4Pdf(invoiceModalRef.current, filename, 2.2);
     } catch (err) {
       console.error('Invoice PDF Export Error:', err);
       window.print();

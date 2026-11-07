@@ -26,7 +26,10 @@ import {
   OpenWaConfig,
   WhatsAppProvider,
   RoasterStaff,
-  WarehouseHead
+  WarehouseHead,
+  BankingPocket,
+  BankingTransaction,
+  PocketTransferRequest
 } from '../types/erp';
 import {
   ACEH_LOKET_PRESETS,
@@ -36,7 +39,9 @@ import {
   SAMPLE_INBOUND,
   SAMPLE_OUTBOUND,
   DEFAULT_ROASTER_STAFF,
-  DEFAULT_WAREHOUSE_HEAD
+  DEFAULT_WAREHOUSE_HEAD,
+  DEFAULT_BANKING_POCKETS,
+  DEFAULT_BANKING_TRANSACTIONS
 } from '../data/initialData';
 
 export const COLLECTIONS = {
@@ -51,7 +56,9 @@ export const COLLECTIONS = {
   OUTBOUND: 'outbound_movements',
   SETTINGS: 'system_settings',
   ROASTER_STAFF: 'roaster_staff',
-  WAREHOUSE_HEADS: 'warehouse_heads'
+  WAREHOUSE_HEADS: 'warehouse_heads',
+  BANKING_POCKETS: 'banking_pockets',
+  BANKING_TRANSACTIONS: 'banking_transactions'
 } as const;
 
 // Local Reactive Store & Cache Helpers
@@ -1763,4 +1770,510 @@ export async function dispatchWhatsAppNotification(
       message: `Gagal mengirim via OpenWA: ${err?.message || 'Periksa server OpenWA Anda'}`
     };
   }
+}
+
+// ==========================================
+// BANKING & MULTI-KANTONG KAS DIGITAL
+// ==========================================
+
+export function subscribeToBankingPockets(
+  callback: (pockets: BankingPocket[]) => void,
+  fallback: BankingPocket[] = DEFAULT_BANKING_POCKETS
+): () => void {
+  const path = COLLECTIONS.BANKING_POCKETS;
+  const initialData = getLocalCache<BankingPocket[]>(path, fallback);
+  callback(initialData && initialData.length > 0 ? initialData : fallback);
+
+  const localUnsub = listenLocalCache<BankingPocket[]>(path, (data) => {
+    if (data && data.length > 0) callback(data);
+  });
+
+  let firestoreUnsub: (() => void) | null = null;
+  try {
+    firestoreUnsub = onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as BankingPocket));
+          setLocalCache(path, items);
+          callback(items);
+        } else {
+          // If Firestore collection is empty, seed with the 3 default pockets
+          setLocalCache(path, fallback);
+          callback(fallback);
+          // Auto-seed to Firestore in background
+          fallback.forEach((p) => {
+            saveBankingPocket(p).catch((e) => console.debug('Auto-seed pocket warning:', e));
+          });
+        }
+      },
+      (error) => {
+        console.warn('Real-time listener fallback on banking pockets:', error?.message || error);
+        callback(getLocalCache<BankingPocket[]>(path, fallback));
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  } catch (err) {
+    console.warn('Subscription init warning on banking pockets:', err);
+  }
+
+  return () => {
+    localUnsub();
+    if (firestoreUnsub) firestoreUnsub();
+  };
+}
+
+export function subscribeToBankingTransactions(
+  callback: (transactions: BankingTransaction[]) => void,
+  fallback: BankingTransaction[] = DEFAULT_BANKING_TRANSACTIONS
+): () => void {
+  const path = COLLECTIONS.BANKING_TRANSACTIONS;
+  const initialData = getLocalCache<BankingTransaction[]>(path, fallback);
+  callback(initialData && initialData.length > 0 ? initialData : fallback);
+
+  const localUnsub = listenLocalCache<BankingTransaction[]>(path, (data) => {
+    if (data && data.length > 0) callback(data);
+  });
+
+  let firestoreUnsub: (() => void) | null = null;
+  try {
+    firestoreUnsub = onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as BankingTransaction));
+          items.sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
+          setLocalCache(path, items);
+          callback(items);
+        } else {
+          setLocalCache(path, fallback);
+          callback(fallback);
+          fallback.forEach((tx) => {
+            saveBankingTransaction(tx).catch((e) => console.debug('Auto-seed transaction warning:', e));
+          });
+        }
+      },
+      (error) => {
+        console.warn('Real-time listener fallback on banking transactions:', error?.message || error);
+        callback(getLocalCache<BankingTransaction[]>(path, fallback));
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  } catch (err) {
+    console.warn('Subscription init warning on banking transactions:', err);
+  }
+
+  return () => {
+    localUnsub();
+    if (firestoreUnsub) firestoreUnsub();
+  };
+}
+
+export async function saveBankingPocket(pocket: BankingPocket): Promise<void> {
+  const path = `${COLLECTIONS.BANKING_POCKETS}/${pocket.id}`;
+  const current = getLocalCache<BankingPocket[]>(COLLECTIONS.BANKING_POCKETS, DEFAULT_BANKING_POCKETS);
+  const idx = current.findIndex((p) => p.id === pocket.id);
+  const updated = idx >= 0 ? current.map((p) => (p.id === pocket.id ? pocket : p)) : [...current, pocket];
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updated);
+
+  try {
+    const payload = removeUndefined({
+      ...pocket,
+      updatedAt: new Date().toISOString()
+    });
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.BANKING_POCKETS, pocket.id), payload));
+    await syncToRTDB(COLLECTIONS.BANKING_POCKETS, pocket.id, payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function saveBankingPockets(pockets: BankingPocket[]): Promise<void> {
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, pockets);
+  const batch = writeBatch(db);
+  for (const p of pockets) {
+    const payload = removeUndefined({
+      ...p,
+      updatedAt: new Date().toISOString()
+    });
+    batch.set(doc(db, COLLECTIONS.BANKING_POCKETS, p.id), payload);
+    syncToRTDB(COLLECTIONS.BANKING_POCKETS, p.id, payload).catch(() => {});
+  }
+  try {
+    await safeFirestoreWrite(batch.commit());
+  } catch (err) {
+    console.warn('Batch write banking pockets warning:', err);
+  }
+}
+
+export async function deleteBankingPocket(pocketId: string): Promise<void> {
+  const path = `${COLLECTIONS.BANKING_POCKETS}/${pocketId}`;
+  const current = getLocalCache<BankingPocket[]>(COLLECTIONS.BANKING_POCKETS, DEFAULT_BANKING_POCKETS);
+  const updated = current.filter((p) => p.id !== pocketId);
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updated);
+
+  try {
+    await safeFirestoreWrite(deleteDoc(doc(db, COLLECTIONS.BANKING_POCKETS, pocketId)));
+    await syncToRTDB(COLLECTIONS.BANKING_POCKETS, pocketId, null);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function saveBankingTransaction(tx: BankingTransaction): Promise<void> {
+  const path = `${COLLECTIONS.BANKING_TRANSACTIONS}/${tx.id}`;
+  const current = getLocalCache<BankingTransaction[]>(COLLECTIONS.BANKING_TRANSACTIONS, []);
+  const updated = [tx, ...current.filter((item) => item.id !== tx.id)];
+  setLocalCache(COLLECTIONS.BANKING_TRANSACTIONS, updated);
+
+  try {
+    const payload = removeUndefined({
+      ...tx,
+      createdAt: tx.createdAt || new Date().toISOString()
+    });
+    await safeFirestoreWrite(setDoc(doc(db, COLLECTIONS.BANKING_TRANSACTIONS, tx.id), payload));
+    await syncToRTDB(COLLECTIONS.BANKING_TRANSACTIONS, tx.id, payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+// Pemindahan dana instan antar kantong kas
+export async function transferBetweenPockets(
+  req: PocketTransferRequest,
+  currentPockets: BankingPocket[]
+): Promise<{ success: boolean; message: string; updatedPockets: BankingPocket[] }> {
+  if (req.amount <= 0) {
+    return { success: false, message: 'Nominal transfer harus lebih besar dari Rp 0', updatedPockets: currentPockets };
+  }
+  if (req.sourcePocketId === req.targetPocketId) {
+    return { success: false, message: 'Kantong asal dan kantong tujuan tidak boleh sama', updatedPockets: currentPockets };
+  }
+
+  const source = currentPockets.find((p) => p.id === req.sourcePocketId);
+  const target = currentPockets.find((p) => p.id === req.targetPocketId);
+
+  if (!source || !target) {
+    return { success: false, message: 'Kantong asal atau tujuan tidak ditemukan', updatedPockets: currentPockets };
+  }
+
+  if (source.balance < req.amount) {
+    return {
+      success: false,
+      message: `Saldo ${source.name} tidak mencukupi (Tersedia: Rp ${source.balance.toLocaleString('id-ID')})`,
+      updatedPockets: currentPockets
+    };
+  }
+
+  const now = new Date().toISOString();
+  const refNumber = `TRF-${Date.now().toString().slice(-6)}`;
+
+  const updatedSource: BankingPocket = {
+    ...source,
+    balance: source.balance - req.amount,
+    updatedAt: now
+  };
+
+  const updatedTarget: BankingPocket = {
+    ...target,
+    balance: target.balance + req.amount,
+    updatedAt: now
+  };
+
+  const sourceTx: BankingTransaction = {
+    id: `tx-${Date.now()}-out`,
+    pocketId: source.id,
+    pocketName: source.name,
+    type: 'transfer_out',
+    amount: req.amount,
+    balanceBefore: source.balance,
+    balanceAfter: updatedSource.balance,
+    description: req.notes || `Pindah ke ${target.name}`,
+    category: req.category || 'Pindah Kantong',
+    counterpartyPocketId: target.id,
+    counterpartyPocketName: target.name,
+    referenceNumber: refNumber,
+    date: now,
+    createdAt: now
+  };
+
+  const targetTx: BankingTransaction = {
+    id: `tx-${Date.now()}-in`,
+    pocketId: target.id,
+    pocketName: target.name,
+    type: 'transfer_in',
+    amount: req.amount,
+    balanceBefore: target.balance,
+    balanceAfter: updatedTarget.balance,
+    description: req.notes ? `Dari ${source.name}: ${req.notes}` : `Terima pindah dari ${source.name}`,
+    category: req.category || 'Pindah Kantong',
+    counterpartyPocketId: source.id,
+    counterpartyPocketName: source.name,
+    referenceNumber: refNumber,
+    date: now,
+    createdAt: now
+  };
+
+  const updatedPockets = currentPockets.map((p) => {
+    if (p.id === source.id) return updatedSource;
+    if (p.id === target.id) return updatedTarget;
+    return p;
+  });
+
+  // Save to local cache first
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updatedPockets);
+
+  // Persist pockets to Firestore & RTDB
+  await Promise.all([
+    saveBankingPocket(updatedSource),
+    saveBankingPocket(updatedTarget),
+    saveBankingTransaction(sourceTx),
+    saveBankingTransaction(targetTx)
+  ]);
+
+  return {
+    success: true,
+    message: `Berhasil memindahkan Rp ${req.amount.toLocaleString('id-ID')} dari ${source.name} ke ${target.name}`,
+    updatedPockets
+  };
+}
+
+// Add funds to a pocket (Setor / Top Up / Pemasukan Kas)
+export async function addPocketFunds(
+  pocketId: string,
+  amount: number,
+  description: string,
+  category: string,
+  currentPockets: BankingPocket[],
+  referenceNumber?: string
+): Promise<{ success: boolean; message: string; updatedPockets: BankingPocket[] }> {
+  if (amount <= 0) {
+    return { success: false, message: 'Nominal setor harus lebih besar dari Rp 0', updatedPockets: currentPockets };
+  }
+
+  const pocket = currentPockets.find((p) => p.id === pocketId);
+  if (!pocket) {
+    return { success: false, message: 'Kantong tidak ditemukan', updatedPockets: currentPockets };
+  }
+
+  const now = new Date().toISOString();
+  const updatedPocket: BankingPocket = {
+    ...pocket,
+    balance: pocket.balance + amount,
+    updatedAt: now
+  };
+
+  const tx: BankingTransaction = {
+    id: `tx-${Date.now()}-dep`,
+    pocketId: pocket.id,
+    pocketName: pocket.name,
+    type: 'deposit',
+    amount,
+    balanceBefore: pocket.balance,
+    balanceAfter: updatedPocket.balance,
+    description: description || `Setor dana ke ${pocket.name}`,
+    category: category || 'Pemasukan Kas',
+    referenceNumber: referenceNumber || `DEP-${Date.now().toString().slice(-6)}`,
+    date: now,
+    createdAt: now
+  };
+
+  const updatedPockets = currentPockets.map((p) => (p.id === pocket.id ? updatedPocket : p));
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updatedPockets);
+
+  await Promise.all([
+    saveBankingPocket(updatedPocket),
+    saveBankingTransaction(tx)
+  ]);
+
+  return {
+    success: true,
+    message: `Berhasil menambahkan Rp ${amount.toLocaleString('id-ID')} ke ${pocket.name}`,
+    updatedPockets
+  };
+}
+
+// Withdraw funds from a pocket (Tarik / Pengeluaran / Biaya Operasional)
+export async function withdrawPocketFunds(
+  pocketId: string,
+  amount: number,
+  description: string,
+  category: string,
+  currentPockets: BankingPocket[],
+  referenceNumber?: string
+): Promise<{ success: boolean; message: string; updatedPockets: BankingPocket[] }> {
+  if (amount <= 0) {
+    return { success: false, message: 'Nominal penarikan harus lebih besar dari Rp 0', updatedPockets: currentPockets };
+  }
+
+  const pocket = currentPockets.find((p) => p.id === pocketId);
+  if (!pocket) {
+    return { success: false, message: 'Kantong tidak ditemukan', updatedPockets: currentPockets };
+  }
+
+  if (pocket.balance < amount) {
+    return {
+      success: false,
+      message: `Saldo ${pocket.name} tidak mencukupi (Tersedia: Rp ${pocket.balance.toLocaleString('id-ID')})`,
+      updatedPockets: currentPockets
+    };
+  }
+
+  const now = new Date().toISOString();
+  const updatedPocket: BankingPocket = {
+    ...pocket,
+    balance: pocket.balance - amount,
+    updatedAt: now
+  };
+
+  const tx: BankingTransaction = {
+    id: `tx-${Date.now()}-wth`,
+    pocketId: pocket.id,
+    pocketName: pocket.name,
+    type: 'withdrawal',
+    amount,
+    balanceBefore: pocket.balance,
+    balanceAfter: updatedPocket.balance,
+    description: description || `Pengeluaran dari ${pocket.name}`,
+    category: category || 'Pengeluaran Kas',
+    referenceNumber: referenceNumber || `WTH-${Date.now().toString().slice(-6)}`,
+    date: now,
+    createdAt: now
+  };
+
+  const updatedPockets = currentPockets.map((p) => (p.id === pocket.id ? updatedPocket : p));
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updatedPockets);
+
+  await Promise.all([
+    saveBankingPocket(updatedPocket),
+    saveBankingTransaction(tx)
+  ]);
+
+  return {
+    success: true,
+    message: `Berhasil menarik Rp ${amount.toLocaleString('id-ID')} dari ${pocket.name}`,
+    updatedPockets
+  };
+}
+
+// Penyesuaian Saldo Aktual (Opname Kas / Rekening Riil)
+export async function adjustPocketBalance(
+  pocketId: string,
+  newBalance: number,
+  notes: string,
+  currentPockets: BankingPocket[]
+): Promise<{ success: boolean; message: string; updatedPockets: BankingPocket[] }> {
+  if (newBalance < 0) {
+    return { success: false, message: 'Saldo tidak boleh negatif (minimal Rp 0)', updatedPockets: currentPockets };
+  }
+
+  const pocket = currentPockets.find((p) => p.id === pocketId);
+  if (!pocket) {
+    return { success: false, message: 'Kantong tidak ditemukan', updatedPockets: currentPockets };
+  }
+
+  const delta = newBalance - pocket.balance;
+  if (delta === 0) {
+    return { success: true, message: `Saldo ${pocket.name} sudah sesuai (tidak ada perubahan)`, updatedPockets: currentPockets };
+  }
+
+  const now = new Date().toISOString();
+  const updatedPocket: BankingPocket = {
+    ...pocket,
+    balance: newBalance,
+    updatedAt: now
+  };
+
+  const tx: BankingTransaction = {
+    id: `tx-${Date.now()}-adj`,
+    pocketId: pocket.id,
+    pocketName: pocket.name,
+    type: delta > 0 ? 'deposit' : 'withdrawal',
+    amount: Math.abs(delta),
+    balanceBefore: pocket.balance,
+    balanceAfter: newBalance,
+    description: notes || `Penyesuaian Saldo Aktual Opname (${delta > 0 ? '+' : '-'}Rp ${Math.abs(delta).toLocaleString('id-ID')})`,
+    category: 'Penyesuaian Saldo',
+    referenceNumber: `ADJ-${Date.now().toString().slice(-6)}`,
+    date: now,
+    createdAt: now
+  };
+
+  const updatedPockets = currentPockets.map((p) => (p.id === pocket.id ? updatedPocket : p));
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updatedPockets);
+
+  await Promise.all([
+    saveBankingPocket(updatedPocket),
+    saveBankingTransaction(tx)
+  ]);
+
+  return {
+    success: true,
+    message: `Saldo ${pocket.name} berhasil disesuaikan menjadi Rp ${newBalance.toLocaleString('id-ID')}`,
+    updatedPockets
+  };
+}
+
+// Sinkronisasi otomatis saldo kantong dengan data aktual pesanan & stok roastery
+export async function syncPocketsWithActualBusinessData(
+  actualPaidSales: number,
+  actualStockCost: number,
+  actualEstimatedProfit: number,
+  currentPockets: BankingPocket[]
+): Promise<{ success: boolean; message: string; updatedPockets: BankingPocket[] }> {
+  const now = new Date().toISOString();
+
+  const updatedPockets = currentPockets.map((pocket) => {
+    if (pocket.slug === 'penjualan' || pocket.type === 'sales') {
+      return {
+        ...pocket,
+        balance: actualPaidSales,
+        updatedAt: now
+      };
+    }
+    if (pocket.slug === 'gudang' || pocket.type === 'warehouse') {
+      return {
+        ...pocket,
+        balance: actualStockCost > 0 ? actualStockCost : pocket.balance,
+        updatedAt: now
+      };
+    }
+    if (pocket.slug === 'laba' || pocket.type === 'profit') {
+      return {
+        ...pocket,
+        balance: actualEstimatedProfit > 0 ? actualEstimatedProfit : pocket.balance,
+        updatedAt: now
+      };
+    }
+    return pocket;
+  });
+
+  setLocalCache(COLLECTIONS.BANKING_POCKETS, updatedPockets);
+
+  // Log sync audit transaction
+  const syncTx: BankingTransaction = {
+    id: `tx-${Date.now()}-sync`,
+    pocketId: 'all',
+    pocketName: 'Semua Kantong',
+    type: 'deposit',
+    amount: actualPaidSales,
+    balanceBefore: 0,
+    balanceAfter: updatedPockets.reduce((sum, p) => sum + p.balance, 0),
+    description: `Sinkronisasi Saldo Aktual dari Faktur Penjualan (Rp ${actualPaidSales.toLocaleString('id-ID')}) & Nilai Gudang (Rp ${actualStockCost.toLocaleString('id-ID')})`,
+    category: 'Sinkronisasi Sistem',
+    referenceNumber: `SYNC-${Date.now().toString().slice(-6)}`,
+    date: now,
+    createdAt: now
+  };
+
+  await Promise.all([
+    saveBankingPockets(updatedPockets),
+    saveBankingTransaction(syncTx)
+  ]);
+
+  return {
+    success: true,
+    message: `Semua kantong berhasil disinkronkan dengan omset penjualan aktual dan nilai stok riil!`,
+    updatedPockets
+  };
 }

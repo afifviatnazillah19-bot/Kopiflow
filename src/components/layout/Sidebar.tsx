@@ -15,7 +15,9 @@ import {
   Settings,
   Wheat,
   QrCode,
-  Gauge
+  Gauge,
+  Wallet,
+  FileText
 } from 'lucide-react';
 
 export type NavTab =
@@ -25,6 +27,7 @@ export type NavTab =
   | 'roastlab'
   | 'roasted-beans'
   | 'finance'
+  | 'banking'
   | 'logistics'
   | 'orders'
   | 'invoice'
@@ -101,6 +104,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-500/20 text-emerald-300 text-[10px]'
     },
     {
+      id: 'banking' as NavTab,
+      label: 'Perbankan & Kas (3 Kantong)',
+      icon: Wallet,
+      badge: 'Kas Digital',
+      badgeColor: 'bg-indigo-500/20 text-indigo-300 font-bold'
+    },
+    {
       id: 'logistics' as NavTab,
       label: 'Pengiriman & Surat Jalan',
       icon: Truck,
@@ -112,6 +122,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Pesanan & Faktur (Kasir)',
       icon: ShoppingCart,
       badge: null
+    },
+    {
+      id: 'invoice' as NavTab,
+      label: 'Faktur & Template PDF',
+      icon: FileText,
+      badge: 'Cetak A4',
+      badgeColor: 'bg-amber-500/20 text-amber-300'
     },
     {
       id: 'relations' as NavTab,

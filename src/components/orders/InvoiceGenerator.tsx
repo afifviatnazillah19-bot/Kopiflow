@@ -3,14 +3,8 @@ import {
   FileText,
   Printer,
   Download,
-  Share2,
   CheckCircle2,
   Building2,
-  Calendar,
-  CreditCard,
-  QrCode,
-  Store,
-  Ship,
   Phone,
   Mail,
   MapPin,
@@ -19,15 +13,15 @@ import {
   RefreshCw,
   Edit3,
   Eye,
+  Layers,
+  QrCode,
   SlidersHorizontal,
   ChevronDown,
-  Layers,
-  Sparkles
+  ChevronUp
 } from 'lucide-react';
 import { Order, OrderItem, CoffeeBean, PricingTier, IslandRegion, QrisPaymentConfig } from '../../types/erp';
 import { formatIDR, saveOrder, getPriceByTier, subscribeToQrisConfig, DEFAULT_QRIS_CONFIG } from '../../services/dbService';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { exportElementToA4Pdf } from '../../utils/pdfExport';
 
 interface InvoiceGeneratorProps {
   orders: Order[];
@@ -36,17 +30,14 @@ interface InvoiceGeneratorProps {
   preselectedOrder?: Order | null;
 }
 
-export type InvoiceTemplateTheme = 'classic' | 'modern' | 'minimal' | 'rustic';
-
 export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   orders,
   beans,
   onRefresh,
   preselectedOrder
 }) => {
-  // Mode: 'builder' (custom/new/edit) vs 'browse' (pick from recorded orders)
+  // Selected Order from database
   const [selectedOrderId, setSelectedOrderId] = useState<string>(preselectedOrder?.id || '');
-  const [templateTheme, setTemplateTheme] = useState<InvoiceTemplateTheme>('modern');
 
   // Real-time QRIS & Bank Config
   const [qrisConfig, setQrisConfig] = useState<QrisPaymentConfig>(DEFAULT_QRIS_CONFIG);
@@ -55,9 +46,10 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
     return () => unsub();
   }, []);
 
-  // Invoice Company / Roastery Identity (Customizable)
+  // Roastery / Seller Identity
+  const [isEditingCompany, setIsEditingCompany] = useState<boolean>(false);
   const [companyName, setCompanyName] = useState('KOFIARA ROASTERY & COFFEE LAB');
-  const [companyTagline, setCompanyTagline] = useState('Specialty Coffee Roaster, Gayo Green Beans & Espresso Bar Solutions');
+  const [companyTagline, setCompanyTagline] = useState('Specialty Coffee Roaster, Gayo Green Beans & Espresso Bar');
   const [companyAddress, setCompanyAddress] = useState('Jl. Merdeka No. 88, Mon Geudong, Kota Lhokseumawe, Aceh 24352');
   const [companyPhone, setCompanyPhone] = useState('+62 811-689-2233');
   const [companyEmail, setCompanyEmail] = useState('billing@kofiara.id');
@@ -75,7 +67,6 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
     return d.toISOString().split('T')[0];
   });
   const [paymentStatus, setPaymentStatus] = useState<Order['paymentStatus']>('Paid in Full');
-  const [paymentMethodName, setPaymentMethodName] = useState<string>('QRIS GoPay / Transfer Bank');
 
   // Customer Information
   const [customerName, setCustomerName] = useState<string>('Kedai Kopi Rangkang');
@@ -101,7 +92,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   // Financials
   const [shippingCost, setShippingCost] = useState<number>(25000);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [taxPercent, setTaxPercent] = useState<number>(0); // PPN %
+  const [taxPercent, setTaxPercent] = useState<number>(0);
   const [notes, setNotes] = useState<string>(
     'Terima kasih atas pesanan biji kopi Anda! Biji sangrai telah di-resting sempurna siap diseduh.'
   );
@@ -111,7 +102,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   const [toastMessage, setToastMessage] = useState<string>('');
   const invoicePrintRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync when user selects an existing order from the dropdown
+  // Sync when user selects an existing order from dropdown
   useEffect(() => {
     if (selectedOrderId) {
       const ord = orders.find((o) => o.id === selectedOrderId);
@@ -123,10 +114,18 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
         setCustomerPhone(ord.customerPhone);
         setCustomerEmail(ord.customerEmail);
         setCustomerAddress(ord.customerAddress);
-        setDestinationIsland(ord.destinationIsland);
-        setItems(ord.items && ord.items.length > 0 ? ord.items : items);
-        setShippingCost(ord.shippingCost || 0);
-        setDiscountAmount(ord.discount || 0);
+        if (ord.destinationIsland) setDestinationIsland(ord.destinationIsland);
+        if (ord.items && ord.items.length > 0) {
+          const sanitizedItems = ord.items.map((it) => ({
+            ...it,
+            quantityKg: Number(it.quantityKg) || 0,
+            unitPrice: Number(it.unitPrice) || 0,
+            subtotal: Number(it.subtotal) || (Number(it.quantityKg) || 0) * (Number(it.unitPrice) || 0)
+          }));
+          setItems(sanitizedItems);
+        }
+        setShippingCost(Number(ord.shippingCost) || 0);
+        setDiscountAmount(Number(ord.discount) || 0);
         setPaymentStatus(ord.paymentStatus || 'Paid in Full');
         if (ord.notes) setNotes(ord.notes);
       }
@@ -138,7 +137,10 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
     setItems((prev) =>
       prev.map((it, idx) => {
         if (idx !== index) return it;
-        const updated = { ...it, [field]: val };
+        const updated = {
+          ...it,
+          [field]: field === 'quantityKg' || field === 'unitPrice' ? (val === '' ? 0 : Number(val) || 0) : val
+        };
         if (field === 'beanId') {
           const b = beans.find((bean) => bean.id === val);
           if (b) {
@@ -147,8 +149,10 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
           }
         }
         if (field === 'quantityKg' || field === 'unitPrice' || field === 'beanId') {
-          const qty = Number(field === 'quantityKg' ? val : updated.quantityKg) || 0;
-          const price = Number(field === 'unitPrice' ? val : updated.unitPrice) || 0;
+          const qty = Number(field === 'quantityKg' ? (val === '' ? 0 : Number(val) || 0) : updated.quantityKg) || 0;
+          const price = Number(field === 'unitPrice' ? (val === '' ? 0 : Number(val) || 0) : updated.unitPrice) || 0;
+          updated.quantityKg = qty;
+          updated.unitPrice = price;
           updated.subtotal = Number((qty * price).toFixed(0));
         }
         return updated;
@@ -189,52 +193,35 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
           ...it,
           tierUsed: newTier,
           unitPrice: price,
-          subtotal: Number((it.quantityKg * price).toFixed(0))
+          subtotal: Number(((Number(it.quantityKg) || 0) * price).toFixed(0))
         };
       })
     );
   };
 
   // Calculations
-  const subtotal = items.reduce((acc, it) => acc + (it.subtotal || 0), 0);
+  const subtotal = items.reduce((acc, it) => acc + (Number(it.subtotal) || 0), 0);
   const totalWeightKg = items.reduce((acc, it) => acc + (Number(it.quantityKg) || 0), 0);
   const taxAmount = Number(((subtotal * (Number(taxPercent) || 0)) / 100).toFixed(0));
   const grandTotal = Math.max(0, subtotal + (Number(shippingCost) || 0) + taxAmount - (Number(discountAmount) || 0));
 
-  // PDF Export using html2canvas & jsPDF with high DPI
+  // PDF Export
   const handleExportPDF = async () => {
     if (!invoicePrintRef.current) return;
     setIsExporting(true);
-    setToastMessage('Sedang memproses dan merender PDF Faktur...');
+    setToastMessage('Sedang memproses dan merender PDF Faktur Polos A4...');
 
     try {
       const element = invoicePrintRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2.5, // Crisp rendering for text & QRIS
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       const safeInvoiceName = invoiceNumber.replace(/[\/\\:]/g, '_');
-      pdf.save(`FAKTUR_${safeInvoiceName}_${customerName.replace(/\s+/g, '_')}.pdf`);
+      const filename = `FAKTUR_${safeInvoiceName}_${customerName.replace(/\s+/g, '_')}.pdf`;
+
+      await exportElementToA4Pdf(element, filename, 2.5);
 
       setToastMessage(`Faktur ${invoiceNumber} berhasil diunduh dalam format PDF!`);
       setTimeout(() => setToastMessage(''), 4500);
     } catch (err) {
       console.error('PDF export error:', err);
-      // Fallback to browser print if canvas fails
       window.print();
     } finally {
       setIsExporting(false);
@@ -279,31 +266,31 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
     <div className="space-y-6">
       {/* Toast */}
       {toastMessage && (
-        <div className="rounded-xl bg-emerald-700 text-white p-3.5 text-xs font-bold flex items-center justify-between shadow-lg animate-in fade-in duration-150">
+        <div className="rounded-xl bg-zinc-900 text-white p-3.5 text-xs font-bold flex items-center justify-between shadow-lg animate-in fade-in duration-150 border border-zinc-700">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-200" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
             <span>{toastMessage}</span>
           </div>
-          <button onClick={() => setToastMessage('')} className="text-emerald-200 hover:text-white font-mono">
+          <button onClick={() => setToastMessage('')} className="text-zinc-400 hover:text-white font-mono">
             ✕
           </button>
         </div>
       )}
 
-      {/* Top Banner & Quick Controls */}
-      <div className="rounded-2xl border border-zinc-200 bg-gradient-to-r from-zinc-900 via-zinc-800 to-amber-950 p-5 sm:p-6 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Header & Actions */}
+      <div className="rounded-2xl border border-zinc-300 bg-white p-5 sm:p-6 text-zinc-900 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-bold text-amber-300 ring-1 ring-amber-400/40">
-              PDF Template Studio
+            <span className="rounded-md bg-zinc-100 border border-zinc-300 px-2 py-0.5 text-[11px] font-bold text-zinc-800">
+              Dokumen Faktur Resmi A4
             </span>
-            <span className="text-xs text-zinc-400">Kofiara Roastery Invoicing</span>
+            <span className="text-xs text-zinc-500">Format Polos Standard ERP</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black tracking-tight mt-1">
-            Menu Cetak Faktur & Ekspor PDF
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 mt-1">
+            Menu Cetak Faktur Penjualan (Ekspor PDF)
           </h2>
-          <p className="text-xs text-zinc-300 mt-1 max-w-xl">
-            Pilih pesanan dari database atau isi manual item faktur di formulir sebelah kiri, sesuaikan template visual, dan ekspor langsung menjadi dokumen PDF berkualitas cetak tinggi A4.
+          <p className="text-xs text-zinc-600 mt-1 max-w-xl">
+            Isi formulir data penjualan di kolom kiri, lalu unduh dokumen PDF polos bersih dengan rincian data lengkap, QRIS, dan legalitas roastery.
           </p>
         </div>
 
@@ -311,22 +298,22 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={handleSaveAsOrder}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-600 bg-zinc-800/80 px-3.5 py-2 text-xs font-bold text-zinc-200 hover:bg-zinc-700 transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-800 hover:bg-zinc-100 transition-colors shadow-2xs"
           >
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <span>Simpan ke Database</span>
           </button>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-600 bg-zinc-800/80 px-3.5 py-2 text-xs font-bold text-zinc-200 hover:bg-zinc-700 transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs font-bold text-zinc-800 hover:bg-zinc-100 transition-colors shadow-2xs"
           >
-            <Printer className="h-4 w-4 text-amber-300" />
+            <Printer className="h-4 w-4 text-zinc-700" />
             <span>Cetak (Print)</span>
           </button>
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 px-4 py-2 text-xs font-extrabold text-white shadow-md active:scale-95 transition-all"
+            className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 px-4 py-2 text-xs font-extrabold text-white shadow-md active:scale-95 transition-all"
           >
             {isExporting ? (
               <>
@@ -336,22 +323,22 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
             ) : (
               <>
                 <Download className="h-4 w-4 text-white" />
-                <span>Ekspor PDF (A4)</span>
+                <span>Ekspor PDF (A4 Polos)</span>
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Main Split Interface: Left = Form Inputs, Right = Live Printable Invoice Preview */}
+      {/* Main Split Layout: Left = Form Inputs, Right = Clean Formal A4 Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: Controls & Input Data (lg:col-span-5) */}
+        {/* LEFT COLUMN: Input Forms (lg:col-span-5) */}
         <div className="lg:col-span-5 space-y-4">
           {/* 1. Quick Load From Existing Database Orders */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900">
-                <Layers className="h-4 w-4 text-amber-700" />
+                <Layers className="h-4 w-4 text-zinc-700" />
                 <span>Pilih Pesanan dari Database</span>
               </div>
               <button
@@ -371,7 +358,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                     }
                   ]);
                 }}
-                className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold underline"
+                className="text-[11px] text-zinc-700 hover:text-zinc-950 font-bold underline"
               >
                 + Buat Faktur Baru
               </button>
@@ -380,7 +367,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
             <select
               value={selectedOrderId}
               onChange={(e) => setSelectedOrderId(e.target.value)}
-              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-900 focus:border-amber-600 focus:bg-white focus:outline-hidden"
+              className="w-full rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-900 focus:border-zinc-800 focus:bg-white focus:outline-hidden"
             >
               <option value="">-- Mode Faktur Mandiri / Custom --</option>
               {orders.map((ord) => (
@@ -391,38 +378,87 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
             </select>
           </div>
 
-          {/* 2. Choose Visual Template */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xs space-y-3">
-            <span className="block text-xs font-bold text-zinc-900">Tema Desain Template Faktur</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(
-                [
-                  { id: 'modern', name: 'Modern Amber', desc: 'Aksen Emas Gayo' },
-                  { id: 'classic', name: 'Formal Hitam', desc: 'Standar Korporat' },
-                  { id: 'minimal', name: 'Clean Minimal', desc: 'Simpel & Rapi' },
-                  { id: 'rustic', name: 'Roastery Lab', desc: 'Karakter Kopi' }
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTemplateTheme(t.id)}
-                  className={`rounded-xl p-2.5 text-left border text-xs transition-all ${
-                    templateTheme === t.id
-                      ? 'border-amber-600 bg-amber-50/80 ring-2 ring-amber-600/20'
-                      : 'border-zinc-200 hover:bg-zinc-50'
-                  }`}
-                >
-                  <span className="font-bold text-zinc-900 block text-[11px]">{t.name}</span>
-                  <span className="text-[10px] text-zinc-500 block mt-0.5">{t.desc}</span>
-                </button>
-              ))}
+          {/* 2. Roastery / Company Identity (Editable) */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xs space-y-3 text-xs">
+            <div
+              className="flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setIsEditingCompany(!isEditingCompany)}
+            >
+              <div className="flex items-center gap-1.5 font-bold text-zinc-900">
+                <Building2 className="h-4 w-4 text-zinc-600" />
+                <span>Identitas Roastery & Pengirim</span>
+              </div>
+              <button type="button" className="text-zinc-500 hover:text-zinc-900">
+                {isEditingCompany ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
             </div>
+
+            {isEditingCompany && (
+              <div className="space-y-2.5 pt-2 border-t border-zinc-100">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-0.5">Nama Perusahaan / Roastery</label>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 font-bold text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-0.5">Sub-judul / Tagline</label>
+                  <input
+                    type="text"
+                    value={companyTagline}
+                    onChange={(e) => setCompanyTagline(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-zinc-800 focus:border-zinc-800 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-0.5">Alamat Lengkap</label>
+                  <input
+                    type="text"
+                    value={companyAddress}
+                    onChange={(e) => setCompanyAddress(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-zinc-800 focus:border-zinc-800 focus:outline-hidden"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-semibold text-zinc-700 mb-0.5">No. Telepon / WA</label>
+                    <input
+                      type="text"
+                      value={companyPhone}
+                      onChange={(e) => setCompanyPhone(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-zinc-800 focus:border-zinc-800 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-zinc-700 mb-0.5">Email Billing</label>
+                    <input
+                      type="text"
+                      value={companyEmail}
+                      onChange={(e) => setCompanyEmail(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-zinc-800 focus:border-zinc-800 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-0.5">Nomor NPWP</label>
+                  <input
+                    type="text"
+                    value={companyNpwp}
+                    onChange={(e) => setCompanyNpwp(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-200 px-2.5 py-1.5 text-zinc-800 focus:border-zinc-800 focus:outline-hidden font-mono"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 3. Form Input: Metadata Faktur & Customer */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xs space-y-4">
             <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 border-b border-zinc-100 pb-2">
-              <Edit3 className="h-4 w-4 text-zinc-500" />
+              <Edit3 className="h-4 w-4 text-zinc-600" />
               <span>Data Faktur & Pelanggan</span>
             </div>
 
@@ -433,7 +469,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   type="text"
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono font-bold text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono font-bold text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
 
@@ -442,7 +478,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 <select
                   value={paymentStatus}
                   onChange={(e) => setPaymentStatus(e.target.value as Order['paymentStatus'])}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-semibold text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-semibold text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 >
                   <option value="Paid in Full">Lunas (Paid in Full)</option>
                   <option value="Down Payment">DP / Uang Muka (Down Payment)</option>
@@ -456,7 +492,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   type="date"
                   value={invoiceDate}
                   onChange={(e) => setInvoiceDate(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
 
@@ -466,7 +502,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -480,8 +516,8 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                     type="text"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="cth: Rangkang Coffee Roastery"
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 font-bold focus:border-amber-600 focus:outline-hidden"
+                    placeholder="cth: Kedai Kopi Rangkang"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 font-bold focus:border-zinc-800 focus:outline-hidden"
                   />
                 </div>
 
@@ -490,7 +526,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   <select
                     value={customerType}
                     onChange={(e) => handleTierChange(e.target.value as PricingTier)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-semibold text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-semibold text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                   >
                     <option value="Lokal">Tier 1: Lokal (Walk-in / Roastery)</option>
                     <option value="UMKM">Tier 2: Mitra UMKM (Diskon Kedai)</option>
@@ -506,7 +542,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                     type="text"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                   />
                 </div>
 
@@ -516,7 +552,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                     type="email"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -527,7 +563,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   rows={2}
                   value={customerAddress}
                   onChange={(e) => setCustomerAddress(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -540,7 +576,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+                className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 border border-zinc-300 px-2.5 py-1 text-xs font-bold text-zinc-800 hover:bg-zinc-200 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Tambah Baris Item</span>
@@ -570,7 +606,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                       <select
                         value={it.beanId}
                         onChange={(e) => handleItemChange(idx, 'beanId', e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs focus:border-amber-600 focus:outline-hidden"
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs focus:border-zinc-800 focus:outline-hidden"
                       >
                         {beans.map((b) => (
                           <option key={b.id} value={b.id}>
@@ -585,7 +621,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                       <select
                         value={it.type}
                         onChange={(e) => handleItemChange(idx, 'type', e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs focus:border-amber-600 focus:outline-hidden"
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs focus:border-zinc-800 focus:outline-hidden"
                       >
                         <option value="Roasted Bean">Roasted Bean (Biji Sangrai)</option>
                         <option value="Green Bean">Green Bean (Biji Mentah)</option>
@@ -603,7 +639,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                         step="any"
                         value={it.quantityKg === 0 ? '' : it.quantityKg}
                         onChange={(e) => handleItemChange(idx, 'quantityKg', e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 font-mono font-bold text-xs focus:border-amber-600 focus:outline-hidden"
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 font-mono font-bold text-xs focus:border-zinc-800 focus:outline-hidden"
                       />
                     </div>
 
@@ -615,7 +651,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                         step="1000"
                         value={it.unitPrice}
                         onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
-                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 font-mono text-xs focus:border-amber-600 focus:outline-hidden"
+                        className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-1 font-mono text-xs focus:border-zinc-800 focus:outline-hidden"
                       />
                     </div>
 
@@ -647,7 +683,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   value={shippingCost === 0 ? '' : shippingCost}
                   onChange={(e) => setShippingCost(Number(e.target.value))}
                   placeholder="0"
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
 
@@ -660,7 +696,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   value={discountAmount === 0 ? '' : discountAmount}
                   onChange={(e) => setDiscountAmount(Number(e.target.value))}
                   placeholder="0"
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono text-emerald-700 font-bold focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono text-emerald-700 font-bold focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
 
@@ -672,7 +708,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                   max="100"
                   value={taxPercent}
                   onChange={(e) => setTaxPercent(Number(e.target.value))}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 font-mono text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
                 />
               </div>
             </div>
@@ -683,215 +719,156 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-amber-600 focus:outline-hidden"
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-zinc-900 focus:border-zinc-800 focus:outline-hidden"
               />
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Live Printable A4 Invoice Template (lg:col-span-7) */}
+        {/* RIGHT COLUMN: Live Formal Clean Printable A4 Document Preview (lg:col-span-7) */}
         <div className="lg:col-span-7 sticky top-4">
           <div className="rounded-2xl border border-zinc-300 bg-zinc-200/50 p-3 sm:p-5 shadow-inner">
             <div className="flex items-center justify-between pb-3 text-xs text-zinc-600">
               <div className="flex items-center gap-1.5 font-bold">
-                <Eye className="h-4 w-4 text-amber-700" />
-                <span>Pratinjau Live Dokumen A4 (Siap Ekspor PDF)</span>
+                <Eye className="h-4 w-4 text-zinc-800" />
+                <span>Pratinjau Dokumen A4 Resmi Polos (Siap Ekspor PDF)</span>
               </div>
-              <span className="font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-zinc-300">
-                Ukuran: 210mm x 297mm
+              <span className="font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-zinc-300 text-zinc-700">
+                A4 Standard (210mm x 297mm)
               </span>
             </div>
 
-            {/* THE RENDERED INVOICE CONTAINER (Will be converted to Canvas & PDF) */}
+            {/* THE PLAIN FORMAL INVOICE CONTAINER (Zero themes, pure data completeness) */}
             <div
               ref={invoicePrintRef}
-              className={`w-full bg-white rounded-xl shadow-md p-6 sm:p-8 text-zinc-900 font-sans border transition-all ${
-                templateTheme === 'modern'
-                  ? 'border-amber-300 ring-1 ring-amber-400/20'
-                  : templateTheme === 'rustic'
-                  ? 'border-stone-400 bg-stone-50/30'
-                  : templateTheme === 'minimal'
-                  ? 'border-zinc-200'
-                  : 'border-zinc-900 ring-2 ring-zinc-900/10'
-              }`}
+              className="w-full bg-white rounded-none shadow-md p-6 sm:p-8 text-zinc-900 font-sans border border-zinc-300"
               style={{ minHeight: '840px' }}
             >
-              {/* HEADER ROW */}
-              <div
-                className={`flex flex-col sm:flex-row justify-between items-start gap-4 pb-5 border-b ${
-                  templateTheme === 'modern'
-                    ? 'border-amber-500'
-                    : templateTheme === 'rustic'
-                    ? 'border-amber-900'
-                    : 'border-zinc-900'
-                }`}
-              >
-                {/* Roastery Identity */}
+              {/* HEADER: COMPANY IDENTITY & INVOICE METADATA */}
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-4 border-b-2 border-zinc-900">
+                {/* Left: Roastery Details */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <div
-                      className={`h-9 w-9 rounded-lg flex items-center justify-center font-black text-white ${
-                        templateTheme === 'modern'
-                          ? 'bg-gradient-to-br from-amber-600 to-amber-800'
-                          : templateTheme === 'rustic'
-                          ? 'bg-amber-900'
-                          : 'bg-zinc-900'
-                      }`}
-                    >
+                    <div className="h-9 w-9 bg-zinc-900 text-white font-black text-xs flex items-center justify-center rounded">
                       KF
                     </div>
                     <div>
-                      <h1
-                        className={`text-base sm:text-lg font-black tracking-tight ${
-                          templateTheme === 'modern' ? 'text-amber-950' : 'text-zinc-950'
-                        }`}
-                      >
+                      <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-950 uppercase">
                         {companyName}
                       </h1>
-                      <p className="text-[10px] text-zinc-500 font-medium">{companyTagline}</p>
+                      <p className="text-[10px] text-zinc-600 font-medium">{companyTagline}</p>
                     </div>
                   </div>
 
-                  <div className="text-[11px] text-zinc-600 mt-2.5 space-y-0.5">
-                    <p className="flex items-center gap-1.5">
-                      <MapPin className="h-3 w-3 text-zinc-400 shrink-0" />
+                  <div className="text-[11px] text-zinc-700 mt-2 space-y-0.5 leading-snug">
+                    <p className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-zinc-500 shrink-0" />
                       <span>{companyAddress}</span>
                     </p>
-                    <p className="flex items-center gap-1.5">
-                      <Phone className="h-3 w-3 text-zinc-400 shrink-0" />
-                      <span>{companyPhone}</span>
-                      <span className="text-zinc-300">•</span>
-                      <Mail className="h-3 w-3 text-zinc-400 shrink-0" />
-                      <span>{companyEmail}</span>
+                    <p className="flex items-center gap-2">
+                      <span>Telp/WA: <strong>{companyPhone}</strong></span>
+                      <span>|</span>
+                      <span>Email: {companyEmail}</span>
                     </p>
-                    <p className="text-[10px] text-zinc-400">NPWP: {companyNpwp}</p>
+                    <p className="text-[10px] text-zinc-500">NPWP: {companyNpwp}</p>
                   </div>
                 </div>
 
-                {/* Invoice Title & Metadata */}
+                {/* Right: Invoice Number & Dates */}
                 <div className="text-left sm:text-right shrink-0">
-                  <div
-                    className={`text-xl sm:text-2xl font-black tracking-wider uppercase ${
-                      templateTheme === 'modern'
-                        ? 'text-amber-800'
-                        : templateTheme === 'rustic'
-                        ? 'text-amber-900'
-                        : 'text-zinc-900'
-                    }`}
-                  >
+                  <h2 className="text-xl sm:text-2xl font-black tracking-wider text-zinc-950 uppercase">
                     FAKTUR PENJUALAN
-                  </div>
-                  <div className="font-mono text-sm font-extrabold text-zinc-900 mt-1">
+                  </h2>
+                  <div className="font-mono text-sm font-black text-zinc-900 mt-0.5">
                     {invoiceNumber}
                   </div>
-                  <div className="text-xs text-zinc-600 mt-1 space-y-0.5">
-                    <p>
-                      Tanggal: <strong>{invoiceDate}</strong>
-                    </p>
-                    <p>
-                      Jatuh Tempo: <strong>{dueDate}</strong>
-                    </p>
+                  <div className="text-xs text-zinc-700 mt-1 space-y-0.5">
+                    <p>Tanggal Faktur: <strong className="font-mono">{invoiceDate}</strong></p>
+                    <p>Jatuh Tempo: <strong className="font-mono">{dueDate}</strong></p>
                   </div>
                   <div className="mt-2">
                     <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                      className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
                         paymentStatus === 'Paid in Full'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          ? 'bg-zinc-900 text-white border-zinc-900'
                           : paymentStatus === 'Down Payment'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          ? 'bg-zinc-100 text-zinc-900 border-zinc-400'
+                          : 'bg-zinc-50 text-zinc-800 border-zinc-300'
                       }`}
                     >
-                      {paymentStatus === 'Paid in Full' ? '✓ LUNAS (PAID)' : paymentStatus}
+                      {paymentStatus === 'Paid in Full' ? '✓ LUNAS' : paymentStatus === 'Down Payment' ? 'DIBAYAR SEBAGIAN (DP)' : 'BELUM DIBAYAR'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* CUSTOMER & DESTINATION SECTION */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5 bg-zinc-50 p-4 rounded-xl border border-zinc-200 text-xs">
+              {/* 2-COLUMN DETAILS BOX: BUYER & SHIPPING */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4 p-3.5 bg-zinc-50 rounded border border-zinc-300 text-xs">
+                {/* Column 1: Customer */}
                 <div>
-                  <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
-                    Ditujukan Kepada:
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider block mb-1">
+                    PEMBELI / PELANGGAN:
                   </span>
-                  <div className="font-extrabold text-sm text-zinc-900">{customerName || 'Nama Pelanggan'}</div>
-                  <p className="text-zinc-600 mt-1 leading-relaxed">{customerAddress || 'Alamat Belum Diatur'}</p>
-                  <p className="text-zinc-500 mt-1 flex items-center gap-1">
-                    <Phone className="h-3 w-3 text-zinc-400" />
-                    <span>{customerPhone}</span>
-                    {customerEmail && (
-                      <>
-                        <span className="text-zinc-300">•</span>
-                        <span>{customerEmail}</span>
-                      </>
-                    )}
+                  <div className="font-black text-sm text-zinc-950">{customerName || 'Nama Pelanggan'}</div>
+                  <p className="text-zinc-700 mt-0.5 leading-snug">{customerAddress || 'Alamat Belum Diatur'}</p>
+                  <p className="text-zinc-600 mt-1 font-mono">
+                    Kontak: <strong>{customerPhone}</strong>
+                    {customerEmail && <span className="ml-1 text-zinc-500">({customerEmail})</span>}
                   </p>
                 </div>
 
-                <div className="border-t sm:border-t-0 sm:border-l border-zinc-200 sm:pl-4 pt-3 sm:pt-0">
-                  <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-wider block mb-1">
-                    Informasi Pengiriman & Tier:
+                {/* Column 2: Shipping & Tier */}
+                <div className="border-t sm:border-t-0 sm:border-l border-zinc-300 sm:pl-3.5 pt-2.5 sm:pt-0">
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider block mb-1">
+                    DETAIL PENGIRIMAN & HARGA:
                   </span>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-zinc-600">Tier Harga:</span>
-                      <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                        Tier {customerType}
-                      </span>
+                  <div className="space-y-1 text-zinc-800">
+                    <div>
+                      Kategori Tier Harga: <strong className="font-bold text-zinc-950">Tier {customerType}</strong>
                     </div>
                     <div>
-                      <span className="text-zinc-600">Wilayah Tujuan: </span>
-                      <strong className="text-zinc-900">{destinationIsland}</strong>
+                      Wilayah Destinasi: <strong className="font-bold text-zinc-950">{destinationIsland}</strong>
                     </div>
                     <div>
-                      <span className="text-zinc-600">Metode Angkutan: </span>
-                      <span className="font-medium text-zinc-800">Loket Bus / L300 Aceh & Kargo</span>
+                      Ekspedisi / Courier: <span className="font-medium text-zinc-700">Loket Bus / L300 Aceh & Kargo</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* ITEMIZED TABLE */}
+              {/* ITEMIZED PRODUCTS TABLE */}
               <div className="overflow-x-auto my-4">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr
-                      className={`border-b-2 font-bold uppercase text-[10px] tracking-wider ${
-                        templateTheme === 'modern'
-                          ? 'border-amber-700 text-amber-950 bg-amber-50/50'
-                          : templateTheme === 'rustic'
-                          ? 'border-amber-900 text-amber-900 bg-stone-100'
-                          : 'border-zinc-900 text-zinc-900 bg-zinc-100'
-                      }`}
-                    >
-                      <th className="py-2.5 px-3">No</th>
-                      <th className="py-2.5 px-3">Deskripsi Produk Biji Kopi</th>
-                      <th className="py-2.5 px-3 text-center">Bentuk</th>
-                      <th className="py-2.5 px-3 text-right">Qty (kg)</th>
-                      <th className="py-2.5 px-3 text-right">Harga / kg</th>
-                      <th className="py-2.5 px-3 text-right">Total (IDR)</th>
+                    <tr className="bg-zinc-100 border-y-2 border-zinc-900 text-zinc-950 font-black uppercase text-[10px] tracking-wider">
+                      <th className="py-2 px-2 text-center w-8">NO</th>
+                      <th className="py-2 px-3">DESKRIPSI PRODUK BIJI KOPI</th>
+                      <th className="py-2 px-2 text-center">BENTUK</th>
+                      <th className="py-2 px-3 text-right">QTY (KG)</th>
+                      <th className="py-2 px-3 text-right">HARGA / KG</th>
+                      <th className="py-2 px-3 text-right">TOTAL (IDR)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200">
                     {items.map((it, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50/50">
-                        <td className="py-2.5 px-3 font-mono text-zinc-400">{idx + 1}</td>
-                        <td className="py-2.5 px-3 font-bold text-zinc-900">{it.beanName}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+                      <tr key={idx} className="hover:bg-zinc-50">
+                        <td className="py-2 px-2 text-center font-mono text-zinc-500">{idx + 1}</td>
+                        <td className="py-2 px-3 font-bold text-zinc-950">{it.beanName}</td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="font-semibold text-zinc-700 text-[10px]">
                             {it.type}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-zinc-800">
-                          {Number((it.quantityKg || 0).toFixed(2)).toLocaleString('id-ID', {
+                        <td className="py-2 px-3 text-right font-mono font-bold text-zinc-900">
+                          {(Number(it.quantityKg) || 0).toLocaleString('id-ID', {
                             maximumFractionDigits: 2
                           })}{' '}
                           kg
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-zinc-700">
+                        <td className="py-2 px-3 text-right font-mono text-zinc-800">
                           {formatIDR(it.unitPrice)}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-extrabold text-zinc-900">
+                        <td className="py-2 px-3 text-right font-mono font-black text-zinc-950">
                           {formatIDR(it.subtotal)}
                         </td>
                       </tr>
@@ -900,22 +877,28 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 </table>
               </div>
 
-              {/* TOTALS & BREAKDOWN */}
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pt-3 border-t border-zinc-200 text-xs">
-                <div className="text-zinc-500 max-w-xs space-y-1">
+              {/* TOTALS & SUMMARY BREAKDOWN */}
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pt-2 border-t-2 border-zinc-900 text-xs">
+                {/* Notes & Total Weight */}
+                <div className="text-zinc-600 max-w-xs space-y-1">
                   <p>
-                    Total Berat Biji Kopi:{' '}
-                    <strong className="font-mono text-zinc-900">
-                      {Number(totalWeightKg.toFixed(2)).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
+                    Total Bobot Biji Kopi:{' '}
+                    <strong className="font-mono text-zinc-950 font-black">
+                      {(Number(totalWeightKg) || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 })} kg
                     </strong>
                   </p>
-                  <p className="text-[11px] text-zinc-600 italic">"{notes}"</p>
+                  {notes && (
+                    <div className="text-[11px] text-zinc-600 pt-1 border-t border-zinc-200 italic">
+                      Catatan: "{notes}"
+                    </div>
+                  )}
                 </div>
 
-                <div className="w-full sm:w-64 space-y-1.5 text-zinc-600 bg-zinc-50/80 p-3 rounded-xl border border-zinc-200">
+                {/* Calculation Summary Box */}
+                <div className="w-full sm:w-64 space-y-1 text-zinc-800 bg-zinc-50 p-3 rounded border border-zinc-300">
                   <div className="flex justify-between">
                     <span>Subtotal Produk:</span>
-                    <span className="font-mono text-zinc-900 font-semibold">{formatIDR(subtotal)}</span>
+                    <span className="font-mono text-zinc-950 font-bold">{formatIDR(subtotal)}</span>
                   </div>
                   {shippingCost > 0 && (
                     <div className="flex justify-between">
@@ -924,7 +907,7 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                     </div>
                   )}
                   {discountAmount > 0 && (
-                    <div className="flex justify-between text-emerald-700">
+                    <div className="flex justify-between text-zinc-900">
                       <span>Diskon Kemitraan:</span>
                       <span className="font-mono font-bold">-{formatIDR(discountAmount)}</span>
                     </div>
@@ -935,28 +918,21 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                       <span className="font-mono text-zinc-900">{formatIDR(taxAmount)}</span>
                     </div>
                   )}
-                  <div
-                    className={`flex justify-between border-t pt-2 text-sm font-black ${
-                      templateTheme === 'modern'
-                        ? 'border-amber-500 text-amber-950'
-                        : 'border-zinc-900 text-zinc-950'
-                    }`}
-                  >
-                    <span>Total Pembayaran:</span>
+                  <div className="flex justify-between border-t-2 border-zinc-900 pt-1.5 text-sm font-black text-zinc-950">
+                    <span>TOTAL PEMBAYARAN:</span>
                     <span className="font-mono text-base">{formatIDR(grandTotal)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* PAYMENT SECTION WITH QRIS & BANK */}
-              <div className="mt-6 pt-4 border-t border-zinc-200 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-zinc-50 p-3.5 rounded-xl border border-zinc-200">
-                  {/* QRIS Box */}
-                  <div className="sm:col-span-4 flex flex-col items-center justify-center p-2.5 bg-white rounded-lg border border-zinc-200 text-center">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="font-black text-[10px] tracking-wider text-zinc-900">QRIS</span>
-                      <span className="rounded bg-emerald-600 px-1 py-0.2 text-[8px] font-bold text-white">GOPAY</span>
-                    </div>
+              {/* PAYMENT INFORMATION (QRIS & BANK ACCOUNTS) */}
+              <div className="mt-5 pt-3 border-t border-zinc-300 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-zinc-50 p-3 rounded border border-zinc-300">
+                  {/* QRIS Image */}
+                  <div className="sm:col-span-4 flex flex-col items-center justify-center p-2 bg-white rounded border border-zinc-300 text-center">
+                    <span className="font-black text-[10px] tracking-wider text-zinc-900 mb-1 uppercase">
+                      QRIS GOPAY OFFICIAL
+                    </span>
                     {qrisConfig.qrisImageUrl ? (
                       <img
                         src={qrisConfig.qrisImageUrl}
@@ -964,41 +940,44 @@ export const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                         className="w-24 h-24 object-contain rounded"
                       />
                     ) : (
-                      <div className="w-24 h-24 flex flex-col items-center justify-center bg-zinc-100 rounded border border-dashed border-zinc-300">
-                        <QrCode className="h-10 w-10 text-emerald-700 opacity-80" />
+                      <div className="w-24 h-24 flex flex-col items-center justify-center bg-zinc-100 border border-dashed border-zinc-400 rounded">
+                        <QrCode className="h-10 w-10 text-zinc-700" />
                         <span className="text-[8px] text-zinc-600 mt-0.5 font-bold">Scan QRIS</span>
                       </div>
                     )}
-                    <span className="text-[9px] text-zinc-500 mt-1 font-mono">GoPay / BCA / Mandiri</span>
+                    <span className="text-[9px] text-zinc-600 mt-1 font-mono">Scan via E-Wallet / All Bank</span>
                   </div>
 
-                  {/* Bank & Signature */}
+                  {/* Bank Accounts & Signature */}
                   <div className="sm:col-span-8 flex flex-col justify-between">
                     <div>
-                      <strong className="text-[10px] uppercase font-bold text-zinc-700 block mb-1">
-                        Instruksi Transfer Rekening Resmi:
+                      <strong className="text-[10px] uppercase font-black text-zinc-800 block mb-1">
+                        REKENING BANK PEMBAYARAN RESMI:
                       </strong>
-                      <div className="text-[11px] text-zinc-700 space-y-0.5">
+                      <div className="text-[11px] text-zinc-800 space-y-0.5 leading-snug">
                         <p>
-                          Bank Mandiri: <strong className="font-mono text-zinc-950">137-00-19283-009</strong> (a.n PT Kofiara Nusantara)
+                          Bank Mandiri: <strong className="font-mono text-zinc-950 font-extrabold">137-00-19283-009</strong> (a.n PT Kofiara Nusantara)
                         </p>
                         <p>
-                          Bank BCA: <strong className="font-mono text-zinc-950">872-0091-233</strong> (a.n PT Kofiara Nusantara)
+                          Bank BCA: <strong className="font-mono text-zinc-950 font-extrabold">872-0091-233</strong> (a.n PT Kofiara Nusantara)
                         </p>
                         <p>
-                          GoPay / QRIS: <strong className="font-mono text-emerald-800">{qrisConfig.gopayNumber}</strong> ({qrisConfig.merchantName})
+                          GoPay/QRIS: <strong className="font-mono text-zinc-950 font-bold">{qrisConfig.gopayNumber}</strong> ({qrisConfig.merchantName})
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-end pt-3 border-t border-zinc-200 mt-2">
-                      <div className="text-[10px] text-zinc-400">
-                        Dokumen dicetak otomatis via KopiFlow ERP
+                    {/* Signature Block */}
+                    <div className="flex justify-between items-end pt-3 border-t border-zinc-300 mt-2">
+                      <div className="text-[9px] text-zinc-500 italic">
+                        *Dokumen ini diterbitkan secara sah melalui KopiFlow ERP.
                       </div>
-                      <div className="text-center">
-                        <div className="text-[10px] text-zinc-500">Hormat Kami,</div>
-                        <div className="font-bold text-xs text-zinc-900 mt-6 underline">Kofiara Finance</div>
-                        <div className="text-[9px] text-zinc-400">Lhokseumawe Hub</div>
+                      <div className="text-center shrink-0">
+                        <div className="text-[10px] text-zinc-600">Hormat Kami,</div>
+                        <div className="font-black text-xs text-zinc-950 mt-6 underline uppercase">
+                          Kofiara Finance
+                        </div>
+                        <div className="text-[9px] text-zinc-500">Lhokseumawe Central Hub</div>
                       </div>
                     </div>
                   </div>

@@ -9,7 +9,9 @@ import {
   InboundMovement,
   OutboundMovement,
   RoasterStaff,
-  WarehouseHead
+  WarehouseHead,
+  BankingPocket,
+  BankingTransaction
 } from '../types/erp';
 
 // ACEH LOKET LOGISTICS PRESETS (Angkutan L300 & Bus Kargo Aceh)
@@ -371,5 +373,138 @@ export const DEFAULT_WAREHOUSE_HEAD: WarehouseHead[] = [
     status: 'Primary',
     notes: 'Kepala Gudang Utama Kofiara Hub Lhokseumawe',
     createdAt: new Date().toISOString()
+  }
+];
+
+// DEFAULT BANKING POCKETS (MULTI-KANTONG KAS DIGITAL)
+export const DEFAULT_BANKING_POCKETS: BankingPocket[] = [
+  {
+    id: 'pock-gudang',
+    name: 'Kantong Uang Gudang & Operasional',
+    slug: 'gudang',
+    type: 'warehouse',
+    balance: 18500000,
+    currency: 'IDR',
+    color: 'emerald',
+    iconName: 'Warehouse',
+    description: 'Dana operasional belanja green bean, karung goni, maintenance mesin sangrai, dan ongkos kirim loket L300.',
+    isPrimary: true,
+    targetBalance: 25000000,
+    accountNumber: 'KOF-WH-001',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'pock-penjualan',
+    name: 'Kantong Hasil Penjualan',
+    slug: 'penjualan',
+    type: 'sales',
+    balance: 42750000,
+    currency: 'IDR',
+    color: 'amber',
+    iconName: 'Receipt',
+    description: 'Penampung penerimaan dari pelunasan invoice mitra cafe, penjualan retail roastbean, dan kasir store.',
+    isPrimary: true,
+    targetBalance: 50000000,
+    accountNumber: 'KOF-SALES-002',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'pock-laba',
+    name: 'Kantong Uang Laba & Cadangan',
+    slug: 'laba',
+    type: 'profit',
+    balance: 21300000,
+    currency: 'IDR',
+    color: 'indigo',
+    iconName: 'TrendingUp',
+    description: 'Alokasi laba bersih roastery, cadangan modal investasi, dan dana bagi hasil / dividen owner.',
+    isPrimary: true,
+    targetBalance: 30000000,
+    accountNumber: 'KOF-PROFIT-003',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
+export const DEFAULT_BANKING_TRANSACTIONS: BankingTransaction[] = [
+  {
+    id: 'tx-init-01',
+    pocketId: 'pock-penjualan',
+    pocketName: 'Kantong Hasil Penjualan',
+    type: 'deposit',
+    amount: 15000000,
+    balanceBefore: 27750000,
+    balanceAfter: 42750000,
+    description: 'Penerimaan Invoice INV-2026-031 dari Kopi Rumoh Geudong',
+    category: 'Penjualan Kopi',
+    referenceNumber: 'INV-2026-031',
+    date: new Date(Date.now() - 2 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 2 * 86400000).toISOString()
+  },
+  {
+    id: 'tx-init-02',
+    pocketId: 'pock-penjualan',
+    pocketName: 'Kantong Hasil Penjualan',
+    type: 'transfer_out',
+    amount: 5000000,
+    balanceBefore: 47750000,
+    balanceAfter: 42750000,
+    description: 'Alokasi laba bersih mingguan ke Kantong Laba',
+    category: 'Pindah Kantong',
+    counterpartyPocketId: 'pock-laba',
+    counterpartyPocketName: 'Kantong Uang Laba & Cadangan',
+    referenceNumber: 'TRF-KAS-101',
+    date: new Date(Date.now() - 1 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 1 * 86400000).toISOString()
+  },
+  {
+    id: 'tx-init-03',
+    pocketId: 'pock-laba',
+    pocketName: 'Kantong Uang Laba & Cadangan',
+    type: 'transfer_in',
+    amount: 5000000,
+    balanceBefore: 16300000,
+    balanceAfter: 21300000,
+    description: 'Terima alokasi laba bersih mingguan dari Kantong Penjualan',
+    category: 'Pindah Kantong',
+    counterpartyPocketId: 'pock-penjualan',
+    counterpartyPocketName: 'Kantong Hasil Penjualan',
+    referenceNumber: 'TRF-KAS-101',
+    date: new Date(Date.now() - 1 * 86400000).toISOString(),
+    createdAt: new Date(Date.now() - 1 * 86400000).toISOString()
+  },
+  {
+    id: 'tx-init-04',
+    pocketId: 'pock-penjualan',
+    pocketName: 'Kantong Hasil Penjualan',
+    type: 'transfer_out',
+    amount: 10000000,
+    balanceBefore: 57750000,
+    balanceAfter: 47750000,
+    description: 'Top up kas gudang untuk belanja 100kg Arabica Gayo Natural',
+    category: 'Pindah Kantong',
+    counterpartyPocketId: 'pock-gudang',
+    counterpartyPocketName: 'Kantong Uang Gudang & Operasional',
+    referenceNumber: 'TRF-KAS-102',
+    date: new Date(Date.now() - 12 * 3600000).toISOString(),
+    createdAt: new Date(Date.now() - 12 * 3600000).toISOString()
+  },
+  {
+    id: 'tx-init-05',
+    pocketId: 'pock-gudang',
+    pocketName: 'Kantong Uang Gudang & Operasional',
+    type: 'transfer_in',
+    amount: 10000000,
+    balanceBefore: 8500000,
+    balanceAfter: 18500000,
+    description: 'Terima dana belanja green bean dari Kantong Penjualan',
+    category: 'Pindah Kantong',
+    counterpartyPocketId: 'pock-penjualan',
+    counterpartyPocketName: 'Kantong Hasil Penjualan',
+    referenceNumber: 'TRF-KAS-102',
+    date: new Date(Date.now() - 12 * 3600000).toISOString(),
+    createdAt: new Date(Date.now() - 12 * 3600000).toISOString()
   }
 ];

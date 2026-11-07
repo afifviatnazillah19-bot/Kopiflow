@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   CheckCircle2,
   Gauge,
-  FileText
+  FileText,
+  Wallet,
+  Menu
 } from 'lucide-react';
 
 
@@ -29,6 +31,7 @@ export interface HeaderProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   onOpenMobile?: () => void;
+  onOpenMenuDrawer?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onOpenNewBatchModal: () => void;
@@ -52,6 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentTab,
   onSelectTab,
   onOpenMobile,
+  onOpenMenuDrawer,
   isSidebarCollapsed = false,
   onToggleSidebar,
   onOpenNewOrderModal,
@@ -66,6 +70,19 @@ export const Header: React.FC<HeaderProps> = ({
   activeShipmentsCount = 0,
   partnersCount = 0
 }) => {
+  // Auto-scroll the active tab into view on horizontal nav
+  const activeTabRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [currentTab]);
+
   // Navigation tabs definition for the modern top bar
   const navTabs = [
 
@@ -109,6 +126,13 @@ export const Header: React.FC<HeaderProps> = ({
       icon: Coins,
       badge: 'HPP',
       badgeColor: 'bg-emerald-600/20 text-emerald-800'
+    },
+    {
+      id: 'banking' as NavTab,
+      label: 'Perbankan & Kas',
+      icon: Wallet,
+      badge: '3 Kantong',
+      badgeColor: 'bg-indigo-600/20 text-indigo-800 font-bold'
     },
     {
       id: 'logistics' as NavTab,
@@ -178,6 +202,11 @@ export const Header: React.FC<HeaderProps> = ({
           title: 'Keuangan, HPP & Pembayaran QRIS GoPay',
           subtitle: 'Hitung HPP per kg, tentukan harga 3-tier (Lokal/UMKM/Luar Pulau), dan upload barcode QRIS'
         };
+      case 'banking':
+        return {
+          title: 'Perbankan & Kas Digital (Sistem Multi-Kantong)',
+          subtitle: 'Alokasi dana 3 pos kas (Gudang, Penjualan, Laba), pindah saldo instan, mutasi transaksi, dan simpan Firestore'
+        };
       case 'logistics':
         return {
           title: 'Pengiriman & Surat Jalan (Logistik)',
@@ -217,11 +246,22 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-30 border-b border-zinc-200/90 bg-white/95 backdrop-blur-md shadow-2xs transition-all">
       {/* Upper Navigation Row: Brand, Search, Status & Actions */}
       <div className="px-3 sm:px-6 py-2.5 border-b border-zinc-100 flex items-center justify-between gap-3">
-        {/* Left: Brand Logo */}
-        <div className="flex items-center gap-3">
+        {/* Left: Brand Logo & Mobile Menu */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {onOpenMenuDrawer && (
+            <button
+              type="button"
+              onClick={onOpenMenuDrawer}
+              className="sm:hidden p-1.5 -ml-1 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+              title="Buka Navigasi Menu"
+            >
+              <Menu className="w-5 h-5 text-zinc-700" />
+            </button>
+          )}
+
           {/* Brand Identity */}
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-600 to-amber-800 text-amber-100 shadow-xs ring-1 ring-amber-600/30">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-600 to-amber-800 text-amber-100 shadow-xs ring-1 ring-amber-600/30 shrink-0">
               <Coffee className="h-4 w-4" />
             </div>
             <div className="hidden sm:block">
@@ -327,6 +367,7 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={tab.id}
+                ref={isActive ? activeTabRef : null}
                 onClick={() => onSelectTab(tab.id)}
                 className={`group relative flex items-center gap-1.5 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-all duration-150 shrink-0 ${
                   isActive

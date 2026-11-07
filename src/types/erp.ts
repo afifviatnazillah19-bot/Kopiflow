@@ -393,3 +393,49 @@ export interface NotificationLog {
   sentAt: string;
   createdAt: string;
 }
+
+// BANKING & KAS MULTI-KANTONG DIGITAL
+export type PocketType = 'warehouse' | 'sales' | 'profit' | 'custom';
+export type TransactionType = 'deposit' | 'withdrawal' | 'transfer_in' | 'transfer_out' | 'expense';
+
+export interface BankingPocket {
+  id: string;
+  name: string;
+  slug: 'gudang' | 'penjualan' | 'laba' | string;
+  type: PocketType;
+  balance: number;
+  currency: string;
+  color: string; // Tailwind color key e.g. 'emerald', 'amber', 'indigo'
+  iconName: string; // e.g. 'Warehouse', 'Receipt', 'TrendingUp', 'PiggyBank'
+  description: string;
+  isPrimary?: boolean;
+  targetBalance?: number; // Target simpanan/budget opsional
+  accountNumber?: string; // e.g. "KOF-POCK-001"
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankingTransaction {
+  id: string;
+  pocketId: string;
+  pocketName: string;
+  type: TransactionType;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  description: string;
+  category: string; // e.g. "Pindah Kantong", "Penjualan Kopi", "Beli Green Bean", "Dividen"
+  counterpartyPocketId?: string;
+  counterpartyPocketName?: string;
+  referenceNumber?: string; // e.g. INV number or Transfer Ref
+  date: string;
+  createdAt: string;
+}
+
+export interface PocketTransferRequest {
+  sourcePocketId: string;
+  targetPocketId: string;
+  amount: number;
+  notes: string;
+  category?: string;
+}
